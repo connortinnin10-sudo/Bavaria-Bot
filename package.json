@@ -1,0 +1,21 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "deploy": "node src/deploy-commands.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@discordjs/rest": "^2.6.1",
+    "discord-api-types": "^0.38.49",
+    "discord.js": "^14.26.4",
+    "dotenv": "^17.4.2",
+    "googleapis": "^173.0.0"
+  }
+}
