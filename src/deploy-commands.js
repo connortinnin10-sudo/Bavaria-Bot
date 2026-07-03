@@ -7,8 +7,7 @@ const commands = [
   require("./commands/stats").data.toJSON(),
   require("./commands/addDepartment").data.toJSON(),
   require("./commands/departmentRemove").data.toJSON(),
-  require("./commands/promoteUser").data.toJSON(),
-  require("./commands/demoteUser").data.toJSON(),
+  require("./commands/userRankChange").data.toJSON(),
   require("./commands/userAccountability").data.toJSON(),
   require("./commands/userAccountabilityRemove").data.toJSON(),
 ];

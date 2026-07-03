@@ -12,8 +12,7 @@ const commands = [
   require("./src/commands/stats"),
   require("./src/commands/addDepartment"),
   require("./src/commands/departmentRemove"),
-  require("./src/commands/promoteUser"),
-  require("./src/commands/demoteUser"),
+  require("./src/commands/userRankChange"),
   require("./src/commands/userAccountability"),
   require("./src/commands/userAccountabilityRemove"),
 ];
