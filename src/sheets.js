@@ -333,7 +333,7 @@ async function promoteUser(userId, newRank) {
 
 const ACCOUNTABILITY_TAB = "Accountability";
 const PINK               = { red: 0.918, green: 0.600, blue: 0.600 };
-const CORNFLOWER_BLUE    = { red: 0.643, green: 0.761, blue: 0.957 };
+const CORNFLOWER_BLUE    = { red: 0.788, green: 0.855, blue: 0.973 };
 const H_COL_IDX          = 7; // column H is index 7 (0-based)
 
 function parseDate(str) {
