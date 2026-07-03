@@ -3,6 +3,13 @@ const { findUser, getActiveAccountability, applyAccountability } = require("../s
 
 const DATE_REGEX = /^\d{1,2}\/\d{1,2}\/\d{2}$/;
 
+function parseDate(str) {
+  const parts = str.split("/");
+  if (parts.length !== 3) return null;
+  const d = new Date(2000 + parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+  return isNaN(d.getTime()) ? null : d;
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("user_accountability")
@@ -31,6 +38,19 @@ module.exports = {
     if (!DATE_REGEX.test(leaveDate) || !DATE_REGEX.test(returnDate)) {
       return interaction.editReply({
         content: "❌ Invalid date format. Please use D/M/YY (e.g. `6/7/26`).",
+      });
+    }
+
+    const leaveParsed  = parseDate(leaveDate);
+    const returnParsed = parseDate(returnDate);
+
+    if (!leaveParsed || !returnParsed) {
+      return interaction.editReply({ content: "❌ One or both dates are invalid." });
+    }
+
+    if (returnParsed <= leaveParsed) {
+      return interaction.editReply({
+        content: "❌ Return date must be at least one day after the leave date.",
       });
     }
 
