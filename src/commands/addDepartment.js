@@ -56,6 +56,11 @@ module.exports = {
           content: `❌ **${department}** is full. No available slots.`,
         });
       }
+      if (err.message === "ALREADY_IN_DEPARTMENT") {
+        return interaction.editReply({
+          content: `❌ **${username}** is already in **${department}**.`,
+        });
+      }
       throw err;
     }
 

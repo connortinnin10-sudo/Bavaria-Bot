@@ -213,9 +213,11 @@ async function addToDepartment({ userId, department, rank, username }) {
   let targetRowNumber = null;
   for (let i = 0; i < (dept.endRow - dept.startRow + 1); i++) {
     const row = rows[i] ?? [];
-    if (isDeptRowAvailable(row)) {
+    if ((row[dept.nameIdx] ?? "").toString().trim().toLowerCase() === username.toLowerCase()) {
+      throw new Error("ALREADY_IN_DEPARTMENT");
+    }
+    if (isDeptRowAvailable(row) && targetRowNumber === null) {
       targetRowNumber = dept.startRow + i;
-      break;
     }
   }
   if (targetRowNumber === null) throw new Error("NO_SPACE");
