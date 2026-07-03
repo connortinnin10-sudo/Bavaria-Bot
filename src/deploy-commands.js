@@ -10,6 +10,7 @@ const commands = [
   require("./commands/promoteUser").data.toJSON(),
   require("./commands/demoteUser").data.toJSON(),
   require("./commands/userAccountability").data.toJSON(),
+  require("./commands/userAccountabilityRemove").data.toJSON(),
 ];
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);

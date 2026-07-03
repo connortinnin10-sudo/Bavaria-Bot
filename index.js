@@ -15,6 +15,7 @@ const commands = [
   require("./src/commands/promoteUser"),
   require("./src/commands/demoteUser"),
   require("./src/commands/userAccountability"),
+  require("./src/commands/userAccountabilityRemove"),
 ];
 
 for (const command of commands) {

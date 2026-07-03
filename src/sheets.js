@@ -425,6 +425,29 @@ async function applyAccountability({ userId, leaveDate, returnDate, reason }) {
   return record;
 }
 
+async function removeAccountability(userId) {
+  const sheets   = getSheetsClient();
+  await getOrCreateAccountabilityTab();
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A:F` });
+  const rows = res.data.values ?? [];
+  const tabNames = await getTabNames();
+
+  let found = false;
+  for (let i = 0; i < rows.length; i++) {
+    if ((rows[i][0] ?? "") !== userId) continue;
+    found = true;
+    const current = await findUser(userId);
+    if (current) {
+      const sheetId = tabNames[COMPANY_GID[current.company]].sheetId;
+      await setCellFormat(sheetId, current.rowNumber, H_COL_IDX, CORNFLOWER_BLUE);
+      await setCellNote(sheetId, current.rowNumber, H_COL_IDX, "");
+    }
+    await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:F${i + 1}` });
+    break;
+  }
+  return found;
+}
+
 async function clearExpiredAccountabilities() {
   const sheets = getSheetsClient();
   await getOrCreateAccountabilityTab();
@@ -504,4 +527,4 @@ async function updateUserField({ record, field, newValue, oldUsername }) {
   }
 }
 
-module.exports = { enlistUser, removeUser, getStats, findUser, getUserRank, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, updateUserField, getActiveAccountability, applyAccountability, clearExpiredAccountabilities };
+module.exports = { enlistUser, removeUser, getStats, findUser, getUserRank, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, updateUserField, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities };
