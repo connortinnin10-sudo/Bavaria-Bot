@@ -159,7 +159,7 @@ async function enlistUser({ userId, username, company, timezone, rank }) {
   const info     = tabNames[gid];
   if (!info) throw new Error(`No tab found for company: ${company}`);
 
-  const rows = await fetchEnlistRows(info.name);
+  const rows = await fetchEnlistRows(info.name, ENLIST_START_ROW);
 
   let targetRowNumber = null;
   for (let i = 0; i < rows.length; i++) {
