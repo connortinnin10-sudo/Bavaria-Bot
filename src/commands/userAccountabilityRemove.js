@@ -13,6 +13,7 @@ module.exports = {
     await interaction.deferReply({ flags: 64 });
 
     const targetUser = interaction.options.getUser("user");
+    if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
     const found = await removeAccountability(targetUser.id);
 
     if (!found) {

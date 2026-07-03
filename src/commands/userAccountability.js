@@ -31,6 +31,7 @@ module.exports = {
     await interaction.deferReply({ flags: 64 });
 
     const targetUser = interaction.options.getUser("user");
+    if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
     const leaveDate  = interaction.options.getString("leave_date").trim();
     const returnDate = interaction.options.getString("return_date").trim();
     const reason     = interaction.options.getString("reason").trim();

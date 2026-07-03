@@ -29,6 +29,7 @@ module.exports = {
     // }
 
     const targetUser   = interaction.options.getUser("user");
+    if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
     const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
     const department   = interaction.options.getString("department");
 

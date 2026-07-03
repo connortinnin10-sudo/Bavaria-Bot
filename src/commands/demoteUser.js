@@ -52,6 +52,7 @@ module.exports = {
     // }
 
     const targetUser   = interaction.options.getUser("user");
+    if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
     const newRank      = interaction.options.getString("demoted_to");
     const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
