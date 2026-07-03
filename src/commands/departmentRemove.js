@@ -1,12 +1,12 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { removeFromDepartment } = require("../sheets");
+const { removeFromDepartment, findUser } = require("../sheets");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("department_remove")
     .setDescription("Remove a member from a department")
-    .addStringOption((opt) =>
-      opt.setName("name").setDescription("Their username on the sheet").setRequired(true)
+    .addUserOption((opt) =>
+      opt.setName("user").setDescription("The member to remove").setRequired(true)
     )
     .addStringOption((opt) =>
       opt
@@ -23,14 +23,18 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ flags: 64 });
 
-    // Role check (temporarily disabled for testing)
-    // if (!interaction.member.roles.cache.has(process.env.RECRUITMENT_ROLE_ID)) {
-    //   return interaction.editReply("You do not have permission to use this command.");
-    // }
-
-    const name       = interaction.options.getString("name").trim();
+    const targetUser = interaction.options.getUser("user");
+    if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
     const department = interaction.options.getString("department");
 
+    const record = await findUser(targetUser.id);
+    if (!record) {
+      return interaction.editReply({
+        content: `**${targetUser.username}** was not found in the regiment records.`,
+      });
+    }
+
+    const name    = (record.rowData[2] ?? "").toString().trim();
     const removed = await removeFromDepartment({ name, department });
 
     if (!removed) {
