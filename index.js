@@ -30,10 +30,21 @@ async function runDailyCheck() {
   }
 }
 
+function scheduleMidnightCheck() {
+  const now = new Date();
+  const next = new Date();
+  next.setHours(24, 0, 0, 0); // next midnight
+  const msUntilMidnight = next - now;
+  setTimeout(() => {
+    runDailyCheck();
+    setInterval(runDailyCheck, 24 * 60 * 60 * 1000);
+  }, msUntilMidnight);
+}
+
 client.once("ready", () => {
   console.log(`✅ Bot online as ${client.user.tag}`);
   runDailyCheck();
-  setInterval(runDailyCheck, 24 * 60 * 60 * 1000);
+  scheduleMidnightCheck();
 });
 
 client.on("interactionCreate", async (interaction) => {
