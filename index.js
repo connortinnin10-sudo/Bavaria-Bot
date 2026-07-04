@@ -14,6 +14,7 @@ const commands = [
   require("./src/commands/departmentRemove"),
   require("./src/commands/userRankChange"),
   require("./src/commands/userReserve"),
+  require("./src/commands/recruitAdd"),
   require("./src/commands/userAccountability"),
   require("./src/commands/userAccountabilityRemove"),
 ];
