@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { removeUser, findUser, parseUsername, removeFromAllDepartments } = require("../sheets");
+const { removeUser, findUser, parseUsername, removeFromAllDepartments, getActiveAccountability, removeAccountability } = require("../sheets");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -42,7 +42,11 @@ module.exports = {
       await removeFromAllDepartments(storedUsername);
     }
 
-    // 3. Remove all roles except protected ones
+    // 3a. Clear any active accountability record (cell color restore is skipped since row is already cleared)
+    const accountability = await getActiveAccountability(targetUser.id);
+    if (accountability) await removeAccountability(targetUser.id);
+
+    // 3b. Remove all roles except protected ones
     const keepRoles = new Set(process.env.REMOVE_KEEP_ROLES.split(",").map((r) => r.trim()));
     const rolesToRemove = targetMember.roles.cache.filter(
       (role) => role.id !== interaction.guild.id && !keepRoles.has(role.id)
@@ -53,12 +57,12 @@ module.exports = {
       );
     }
 
-    // 4. Re-add guest role
+    // 4a. Re-add guest role
     await targetMember.roles.add(process.env.GUEST_ROLE).catch((err) =>
       console.error("Failed to add guest role:", err.message)
     );
 
-    // 5. Strip [2.] from nickname
+    // 4b. Strip [2.] from nickname
     const currentNick = targetMember.nickname ?? targetUser.username;
     const cleanNick   = currentNick.replace(/^\[2\.\]\s*/, "").trim();
     await targetMember.setNickname(cleanNick).catch((err) =>
