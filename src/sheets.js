@@ -22,7 +22,11 @@ const COMPANY_GID = {
   Rosenheim: 1875189602,
 };
 
-const DEPT_GID = parseInt(process.env.DEPT_GID, 10);
+const DEPT_GID        = parseInt(process.env.DEPT_GID, 10);
+const RESERVE_GID     = 226567638;
+const RESERVE_START   = 15;
+const RESERVE_END     = 234;
+const RESERVE_COL     = { DISCORD: 0, TIMEZONE: 1, NAME: 2 };
 
 // Department config: rows, columns, capacity
 const DEPARTMENTS = {
@@ -529,4 +533,59 @@ async function updateUserField({ record, field, newValue, oldUsername }) {
   }
 }
 
-module.exports = { enlistUser, removeUser, getStats, findUser, getUserRank, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, updateUserField, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities };
+async function fetchReserveRows() {
+  const tabNames = await getTabNames();
+  const info     = tabNames[RESERVE_GID];
+  if (!info) throw new Error("Reserve sheet tab not found");
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${info.name}!F${RESERVE_START}:H${RESERVE_END}`,
+  });
+  return { rows: res.data.values ?? [], tabName: info.name };
+}
+
+async function findReserveUser(userId) {
+  const { rows, tabName } = await fetchReserveRows();
+  for (let i = 0; i < rows.length; i++) {
+    if ((rows[i][RESERVE_COL.DISCORD] ?? "").toString().trim() === userId) {
+      return { tabName, rowNumber: RESERVE_START + i, rowData: rows[i] };
+    }
+  }
+  return null;
+}
+
+async function reserveUser({ userId, timezone, username }) {
+  const { rows, tabName } = await fetchReserveRows();
+  const sheets = getSheetsClient();
+
+  let targetRow = null;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i] ?? [];
+    if ([0, 1, 2].every(idx => (row[idx] ?? "").toString().trim() === "")) {
+      targetRow = RESERVE_START + i;
+      break;
+    }
+  }
+  if (targetRow === null) throw new Error("NO_SPACE");
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${tabName}!F${targetRow}:H${targetRow}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[userId, timezone, username]] },
+  });
+}
+
+async function removeReserveUser(userId) {
+  const found = await findReserveUser(userId);
+  if (!found) return false;
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: SHEET_ID,
+    range: `${found.tabName}!F${found.rowNumber}:H${found.rowNumber}`,
+  });
+  return true;
+}
+
+module.exports = { enlistUser, removeUser, getStats, findUser, getUserRank, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, updateUserField, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser };
