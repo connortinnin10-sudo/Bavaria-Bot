@@ -32,7 +32,7 @@ const RESERVE_COL     = { DISCORD: 0, TIMEZONE: 1, NAME: 2 };
 const DEPARTMENTS = {
   "Recruitment Department": {
     startRow: 18, endRow: 30,
-    rankCol: "C", nameCol: "D",
+    rankCol: "C", nameCol: "D", tallyCol: "E",
     rankIdx: 0,   nameIdx: 1,
     fetchRange: (s, e) => `C${s}:D${e}`,
   },
@@ -245,10 +245,11 @@ async function removeFromAllDepartments(username) {
     for (let i = 0; i < rows.length; i++) {
       const rowName = (rows[i][dept.nameIdx] ?? "").toString().trim().toLowerCase();
       if (rowName === username.toLowerCase()) {
-        const rowNumber = dept.startRow + i;
+        const rowNumber  = dept.startRow + i;
+        const clearEnd   = dept.tallyCol ?? dept.nameCol;
         await sheets.spreadsheets.values.clear({
           spreadsheetId: SHEET_ID,
-          range: `${deptTab.name}!${dept.rankCol}${rowNumber}:${dept.nameCol}${rowNumber}`,
+          range: `${deptTab.name}!${dept.rankCol}${rowNumber}:${clearEnd}${rowNumber}`,
         });
       }
     }
@@ -281,9 +282,10 @@ async function removeFromDepartment({ name, department }) {
   }
   if (targetRowNumber === null) return false;
 
+  const clearEnd = dept.tallyCol ?? dept.nameCol;
   await sheets.spreadsheets.values.clear({
     spreadsheetId: SHEET_ID,
-    range: `${deptTab.name}!${dept.rankCol}${targetRowNumber}:${dept.nameCol}${targetRowNumber}`,
+    range: `${deptTab.name}!${dept.rankCol}${targetRowNumber}:${clearEnd}${targetRowNumber}`,
   });
   return true;
 }
