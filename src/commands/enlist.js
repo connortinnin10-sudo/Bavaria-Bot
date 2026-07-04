@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { enlistUser, findUser, parseUsername } = require("../sheets");
+const { enlistUser, findUser, parseUsername, findReserveUser, removeReserveUser } = require("../sheets");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -60,6 +60,10 @@ module.exports = {
         content: `${displayName} is already enlisted in the regiment.`,
       });
     }
+
+    // If on reserve, remove them automatically before enlisting
+    const onReserve = await findReserveUser(targetUser.id);
+    if (onReserve) await removeReserveUser(targetUser.id);
 
     try {
       await enlistUser({
