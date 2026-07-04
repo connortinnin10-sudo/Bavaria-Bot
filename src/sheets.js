@@ -406,7 +406,7 @@ async function getActiveAccountability(userId) {
   const rows = res.data.values ?? [];
   const today = new Date(); today.setHours(0, 0, 0, 0);
   for (const row of rows) {
-    if ((row[0] ?? "") !== userId) continue;
+    if ((row[0] ?? "").toString().trim() !== userId.toString()) continue;
     const ret = parseDate(row[4] ?? "");
     if (ret && ret >= today) return row;
   }
@@ -428,7 +428,7 @@ async function applyAccountability({ userId, leaveDate, returnDate, reason }) {
     spreadsheetId: SHEET_ID,
     range: `${ACCOUNTABILITY_TAB}!A:F`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[userId, record.tabName, record.rowNumber, leaveDate, returnDate, reason]] },
+    requestBody: { values: [["'" + userId, record.tabName, record.rowNumber, leaveDate, returnDate, reason]] },
   });
   return record;
 }
@@ -442,7 +442,7 @@ async function removeAccountability(userId) {
 
   let found = false;
   for (let i = 0; i < rows.length; i++) {
-    if ((rows[i][0] ?? "") !== userId) continue;
+    if ((rows[i][0] ?? "").toString().trim() !== userId.toString()) continue;
     found = true;
     const current = await findUser(userId);
     if (current) {
