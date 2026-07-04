@@ -560,7 +560,8 @@ async function reserveUser({ userId, timezone, username }) {
   const sheets = getSheetsClient();
 
   let targetRow = null;
-  for (let i = 0; i < rows.length; i++) {
+  const maxRows = RESERVE_END - RESERVE_START + 1;
+  for (let i = 0; i < maxRows; i++) {
     const row = rows[i] ?? [];
     if ([0, 1, 2].every(idx => (row[idx] ?? "").toString().trim() === "")) {
       targetRow = RESERVE_START + i;
