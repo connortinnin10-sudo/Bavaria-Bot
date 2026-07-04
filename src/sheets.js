@@ -413,6 +413,24 @@ async function getActiveAccountability(userId) {
   return null;
 }
 
+async function isOnAccountability(userId) {
+  const record = await findUser(userId);
+  if (!record) return false;
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.get({
+    spreadsheetId: SHEET_ID,
+    ranges: [`${record.tabName}!H${record.rowNumber}`],
+    includeGridData: true,
+  });
+  const bg = res.data.sheets?.[0]?.data?.[0]?.rowData?.[0]?.values?.[0]?.userEnteredFormat?.backgroundColor;
+  if (!bg) return false;
+  return (
+    Math.abs((bg.red   ?? 0) - PINK.red)   < 0.05 &&
+    Math.abs((bg.green ?? 0) - PINK.green) < 0.05 &&
+    Math.abs((bg.blue  ?? 0) - PINK.blue)  < 0.05
+  );
+}
+
 async function applyAccountability({ userId, leaveDate, returnDate, reason }) {
   const record   = await findUser(userId);
   if (!record) return null;
@@ -675,4 +693,4 @@ async function removeReserveUser(userId) {
   return true;
 }
 
-module.exports = { enlistUser, removeUser, getStats, findUser, getUserRank, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, updateUserField, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet };
+module.exports = { enlistUser, removeUser, getStats, findUser, getUserRank, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, updateUserField, getActiveAccountability, isOnAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet };

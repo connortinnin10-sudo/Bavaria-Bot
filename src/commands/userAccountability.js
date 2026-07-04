@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { findUser, getActiveAccountability, applyAccountability } = require("../sheets");
+const { findUser, isOnAccountability, applyAccountability } = require("../sheets");
 
 const DATE_REGEX = /^\d{1,2}\/\d{1,2}\/\d{2}$/;
 
@@ -55,17 +55,17 @@ module.exports = {
       });
     }
 
-    const existing = await getActiveAccountability(targetUser.id);
-    if (existing) {
-      return interaction.editReply({
-        content: `❌ **${targetUser.username}** already has an active accountability until **${existing[4]}**. Cannot create another until they return.`,
-      });
-    }
-
     const record = await findUser(targetUser.id);
     if (!record) {
       return interaction.editReply({
         content: `**${targetUser.username}** was not found in the regiment records.`,
+      });
+    }
+
+    const alreadyActive = await isOnAccountability(targetUser.id);
+    if (alreadyActive) {
+      return interaction.editReply({
+        content: `❌ **${targetUser.username}** already has an active accountability. It must be removed manually or will clear automatically on the return date.`,
       });
     }
 
