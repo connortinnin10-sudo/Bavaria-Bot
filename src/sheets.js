@@ -404,11 +404,10 @@ async function getActiveAccountability(userId) {
   await getOrCreateAccountabilityTab();
   const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A:F` });
   const rows = res.data.values ?? [];
-  const today = new Date(); today.setHours(0, 0, 0, 0);
   for (const row of rows) {
+    if (!(row[0] ?? "").toString().trim()) continue;
     if ((row[0] ?? "").toString().trim() !== userId.toString()) continue;
-    const ret = parseDate(row[4] ?? "");
-    if (ret && ret >= today) return row;
+    return row;
   }
   return null;
 }
