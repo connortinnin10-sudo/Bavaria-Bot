@@ -571,6 +571,54 @@ async function incrementRecruitCount(username) {
   return newCount;
 }
 
+async function decrementRecruitCount(username) {
+  const tabNames = await getTabNames();
+  const deptTab  = tabNames[DEPT_GID];
+  if (!deptTab) throw new Error("Department tab not found");
+
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${deptTab.name}!D16:E30`,
+  });
+  const rows = res.data.values ?? [];
+
+  let targetRow = null;
+  for (let i = 0; i < rows.length; i++) {
+    const name = (rows[i][0] ?? "").toString().trim();
+    if (name.toLowerCase() === username.toLowerCase()) {
+      targetRow = 16 + i;
+      break;
+    }
+  }
+  if (targetRow === null) return null;
+
+  const rowIndex     = targetRow - 16;
+  const currentCount = parseInt((rows[rowIndex]?.[1] ?? "0").toString().trim(), 10) || 0;
+  const newCount     = Math.max(0, currentCount - 1);
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${deptTab.name}!E${targetRow}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[newCount]] },
+  });
+
+  return newCount;
+}
+
+async function clearRecruitSheet() {
+  const tabNames = await getTabNames();
+  const deptTab  = tabNames[DEPT_GID];
+  if (!deptTab) throw new Error("Department tab not found");
+
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: SHEET_ID,
+    range: `${deptTab.name}!E16:E30`,
+  });
+}
+
 async function fetchReserveRows() {
   const tabNames = await getTabNames();
   const info     = tabNames[RESERVE_GID];
@@ -627,4 +675,4 @@ async function removeReserveUser(userId) {
   return true;
 }
 
-module.exports = { enlistUser, removeUser, getStats, findUser, getUserRank, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, updateUserField, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount };
+module.exports = { enlistUser, removeUser, getStats, findUser, getUserRank, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, updateUserField, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet };
