@@ -1,6 +1,10 @@
 const { setDefaultResultOrder } = require("dns");
 setDefaultResultOrder("ipv4first"); // prevent IPv6 fallback delay on Railway
 
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled rejection:", err);
+});
+
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const { clearExpiredAccountabilities } = require("./src/sheets");
 require("dotenv").config();
