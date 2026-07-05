@@ -13,20 +13,14 @@ module.exports = {
     ),
 
   async execute(interaction) {
-
     const officerRoleId = process.env.DEMERIT_OFFICER_ROLE_ID;
     if (officerRoleId && !interaction.member.roles.cache.has(officerRoleId)) {
       return interaction.editReply({ content: "❌ You do not have permission to use this command." });
     }
 
-    const targetUser   = interaction.options.getUser("user");
+    const targetUser = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
-    const reason       = interaction.options.getString("reason").trim();
-    const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-
-    if (!targetMember) {
-      return interaction.editReply({ content: "Could not find that member in this server." });
-    }
+    const reason = interaction.options.getString("reason").trim();
 
     const record = await findUser(targetUser.id);
     if (!record) {
@@ -51,8 +45,10 @@ module.exports = {
     await targetUser.send(dmLines.join("\n")).catch(() => null);
 
     if (newCount >= 3) {
-      console.log(`[demerit] 3-demerit threshold reached for ${targetUser.id}, swapping roles`);
-      try {
+      const targetMember = interaction.guild.members.cache.get(targetUser.id)
+        ?? await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+
+      if (targetMember) {
         const rolesToRemove = [
           process.env.ROLE_REGIMENT,
           process.env.ROLE_PREMIER_CORPS,
@@ -72,9 +68,6 @@ module.exports = {
             console.error(`Failed to add role ${roleId}:`, err.message)
           );
         }
-        console.log(`[demerit] role swap complete`);
-      } catch (swapErr) {
-        console.error(`[demerit] role swap threw:`, swapErr);
       }
     }
 
