@@ -62,17 +62,18 @@ module.exports = {
       });
     }
 
+    const username    = (record.rowData[2] ?? targetUser.username).toString().trim();
     const currentRank = (record.rowData[0] ?? "").toString().trim();
 
     if (PROTECTED_RANKS.has(currentRank)) {
       return interaction.editReply({
-        content: `**${targetUser.username}** holds the rank of **${currentRank}** and cannot be changed through this command.`,
+        content: `**${username}** holds the rank of **${currentRank}** and cannot be changed through this command.`,
       });
     }
 
     if (currentRank === newRank) {
       return interaction.editReply({
-        content: `**${targetUser.username}** is already ranked **${newRank}**.`,
+        content: `**${username}** is already ranked **${newRank}**.`,
       });
     }
 
@@ -93,7 +94,7 @@ module.exports = {
     }
 
     return interaction.editReply({
-      content: `✅ **${targetUser.username}** has been changed from **${currentRank || "Unknown"}** to **${newRank}**.`,
+      content: `✅ **${username}** has been changed from **${currentRank || "Unknown"}** to **${newRank}**.`,
     });
   },
 };

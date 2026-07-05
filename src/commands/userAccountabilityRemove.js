@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { removeAccountability } = require("../sheets");
+const { removeAccountability, findUser } = require("../sheets");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -14,16 +14,20 @@ module.exports = {
 
     const targetUser = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
+
+    const record   = await findUser(targetUser.id);
+    const username = record ? (record.rowData[2] ?? targetUser.username).toString().trim() : targetUser.username;
+
     const found = await removeAccountability(targetUser.id);
 
     if (!found) {
       return interaction.editReply({
-        content: `**${targetUser.username}** does not have an active accountability.`,
+        content: `**${username}** does not have an active accountability.`,
       });
     }
 
     return interaction.editReply({
-      content: `✅ Accountability removed for **${targetUser.username}**. Their sheet has been restored.`,
+      content: `✅ Accountability removed for **${username}**. Their sheet has been restored.`,
     });
   },
 };

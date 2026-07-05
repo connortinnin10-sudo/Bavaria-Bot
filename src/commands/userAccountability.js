@@ -62,17 +62,19 @@ module.exports = {
       });
     }
 
+    const username = (record.rowData[2] ?? targetUser.username).toString().trim();
+
     const existing = await getActiveAccountability(targetUser.id);
     if (existing) {
       return interaction.editReply({
-        content: `❌ **${targetUser.username}** already has an active accountability. Use \`/user_accountability_remove\` to clear it first.`,
+        content: `❌ **${username}** already has an active accountability. Use \`/user_accountability_remove\` to clear it first.`,
       });
     }
 
     await applyAccountability({ userId: targetUser.id, leaveDate, returnDate, reason });
 
     return interaction.editReply({
-      content: `✅ **${targetUser.username}** has been placed on accountability.\n> **Leave:** ${leaveDate}\n> **Return:** ${returnDate}\n> **Reason:** ${reason}`,
+      content: `✅ **${username}** has been placed on accountability.\n> **Leave:** ${leaveDate}\n> **Return:** ${returnDate}\n> **Reason:** ${reason}`,
     });
   },
 };

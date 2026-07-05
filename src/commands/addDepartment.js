@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { addToDepartment, getUserRank, parseUsername } = require("../sheets");
+const { addToDepartment, findUser } = require("../sheets");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -28,25 +28,19 @@ module.exports = {
     //   return interaction.editReply("You do not have permission to use this command.");
     // }
 
-    const targetUser   = interaction.options.getUser("user");
+    const targetUser = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
-    const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-    const department   = interaction.options.getString("department");
+    const department = interaction.options.getString("department");
 
-    if (!targetMember) {
-      return interaction.editReply({ content: "Could not find that member in this server." });
-    }
-
-    // Parse username using the same rule as enlist
-    const username = parseUsername(targetMember.nickname ?? targetUser.username);
-
-    // Look up their rank from the enlist sheet
-    const rank = await getUserRank(targetUser.id);
-    if (!rank) {
+    const record = await findUser(targetUser.id);
+    if (!record) {
       return interaction.editReply({
-        content: `**${username}** is not found in the regiment records. They must be enlisted first.`,
+        content: `**${targetUser.username}** is not found in the regiment records. They must be enlisted first.`,
       });
     }
+
+    const username = (record.rowData[2] ?? "").toString().trim();
+    const rank     = (record.rowData[0] ?? "").toString().trim();
 
     try {
       await addToDepartment({ userId: targetUser.id, department, rank, username });
