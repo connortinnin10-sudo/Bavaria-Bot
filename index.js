@@ -68,8 +68,6 @@ client.on("interactionCreate", async (interaction) => {
   if (handledInteractions.has(interaction.id)) return;
   handledInteractions.add(interaction.id);
 
-  // Discard stale interactions (expired before we could respond)
-  if (Date.now() - interaction.createdTimestamp > 2500) return;
 
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
