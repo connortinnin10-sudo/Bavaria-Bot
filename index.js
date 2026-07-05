@@ -2,7 +2,7 @@ const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const { clearExpiredAccountabilities } = require("./src/sheets");
 require("dotenv").config();
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.DirectMessages] });
 
 client.commands = new Collection();
 
