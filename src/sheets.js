@@ -346,7 +346,7 @@ const J_COL_IDX          = 9;  // column J (LOA checkbox), 0-based absolute inde
 
 const DEMERIT_TAB    = "Demerits";
 const CORNFLOWER_BLUE = { red: 0.788, green: 0.855, blue: 0.973 };
-const K_COL_IDX      = 10; // column K (Discord ID / demerit color), 0-based absolute index
+const I_COL_IDX      = 8; // column I (name/nickname, demerit color), 0-based absolute index
 const DEMERIT_COLORS = {
   0: CORNFLOWER_BLUE,
   1: { red: 0.878, green: 0.400, blue: 0.400 },
@@ -446,7 +446,7 @@ async function applyAccountability({ userId, leaveDate, returnDate, reason }) {
     spreadsheetId: SHEET_ID,
     range: `${record.tabName}!J${record.rowNumber}`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [["TRUE"]] },
+    requestBody: { values: [[true]] },
   });
   // Add note to the checkbox cell
   await setCellNote(sheetId, record.rowNumber, J_COL_IDX, `Leave: ${leaveDate} | Return: ${returnDate} | Reason: ${reason}`);
@@ -480,7 +480,7 @@ async function removeAccountability(userId) {
         spreadsheetId: SHEET_ID,
         range: `${current.tabName}!J${current.rowNumber}`,
         valueInputOption: "USER_ENTERED",
-        requestBody: { values: [["FALSE"]] },
+        requestBody: { values: [[false]] },
       });
       await setCellNote(sheetId, current.rowNumber, J_COL_IDX, "");
     }
@@ -513,7 +513,7 @@ async function clearExpiredAccountabilities() {
         spreadsheetId: SHEET_ID,
         range: `${current.tabName}!J${current.rowNumber}`,
         valueInputOption: "USER_ENTERED",
-        requestBody: { values: [["FALSE"]] },
+        requestBody: { values: [[false]] },
       });
       await setCellNote(sheetId, current.rowNumber, J_COL_IDX, "");
     }
@@ -741,7 +741,7 @@ async function setDemeritColor(userId, count) {
   const tabNames = await getTabNames();
   const sheetId  = tabNames[COMPANY_GID[record.company]].sheetId;
   const color    = DEMERIT_COLORS[Math.min(count, 3)];
-  await setCellFormat(sheetId, record.rowNumber, K_COL_IDX, color);
+  await setCellFormat(sheetId, record.rowNumber, I_COL_IDX, color);
 }
 
 async function addDemerit(userId, reason, addedBy) {
