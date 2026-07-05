@@ -54,8 +54,6 @@ function scheduleMidnightCheck() {
 client.once("ready", async () => {
   console.log(`✅ Bot online as ${client.user.tag}`);
   await client.application.fetch().catch(() => {});
-  // Keep the REST connection alive so deferReply never hits a cold TCP handshake
-  setInterval(() => client.application.fetch().catch(() => {}), 4 * 60 * 1000);
   runDailyCheck();
   scheduleMidnightCheck();
 });
