@@ -94,7 +94,7 @@ client.on("interactionCreate", async (interaction) => {
     console.error(err);
     if (err?.code === 10062) return; // interaction expired — nothing to reply to
     try {
-      const msg = { content: "An error occurred. Please try again.", flags: 64 };
+      const msg = { content: `❌ Error: ${err?.message ?? String(err)}`, flags: 64 };
       if (interaction.deferred || interaction.replied) {
         await interaction.editReply(msg);
       } else {
