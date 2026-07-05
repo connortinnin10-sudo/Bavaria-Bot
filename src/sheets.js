@@ -749,14 +749,18 @@ async function addDemerit(userId, reason, addedBy) {
   const sheets = getSheetsClient();
   await getOrCreateDemeritTab();
   const today  = new Date().toLocaleDateString("en-GB");
+  console.log(`[demerit] appending for ${userId}`);
   await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
     range:         `${DEMERIT_TAB}!A:D`,
     valueInputOption: "USER_ENTERED",
     requestBody:   { values: [["'" + userId, reason, today, "'" + addedBy]] },
   });
+  console.log(`[demerit] append ok, counting`);
   const count = await getDemeritCount(userId);
+  console.log(`[demerit] count=${count}, coloring`);
   await setDemeritColor(userId, count);
+  console.log(`[demerit] done`);
   return count;
 }
 
