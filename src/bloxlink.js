@@ -10,7 +10,7 @@ async function getRobloxUsername(discordId) {
   try {
     // Try guild-specific endpoint first
     const res = await fetch(
-      `https://api.blox.link/v4/public/guilds/${guildId}/discord-to-roblox/${discordId}`,
+      `https://api.blox.link/v4/public/guilds/${guildId}/discord-to-roblox/${discordId}?api-key=${apiKey}`,
       { headers: { "api-key": apiKey }, signal: controller.signal }
     );
 
