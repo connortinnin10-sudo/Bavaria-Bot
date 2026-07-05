@@ -53,7 +53,6 @@ const DEPARTMENTS = {
 
 let tabNameCache = null;
 let _auth = null;
-let _sheetsClient = null;
 
 async function getTabNames() {
   if (tabNameCache) return tabNameCache;
@@ -84,10 +83,7 @@ function getAuth() {
 }
 
 function getSheetsClient() {
-  if (!_sheetsClient) {
-    _sheetsClient = google.sheets({ version: "v4", auth: getAuth() });
-  }
-  return _sheetsClient;
+  return google.sheets({ version: "v4", auth: getAuth() });
 }
 
 // Strip [2.], ignore anything in quotes, ignore anything after a comma
@@ -767,8 +763,8 @@ async function addDemerit(userId, reason, addedBy) {
   await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
     range:         `${DEMERIT_TAB}!A:D`,
-    valueInputOption: "USER_ENTERED",
-    requestBody:   { values: [["'" + userId, reason, today, "'" + addedBy]] },
+    valueInputOption: "RAW",
+    requestBody:   { values: [[userId.toString(), reason, today, addedBy.toString()]] },
   });
   console.log(`[demerit] append ok, counting`);
   const count = await getDemeritCount(userId);
