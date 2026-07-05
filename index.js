@@ -53,8 +53,9 @@ function scheduleMidnightCheck() {
 
 client.once("ready", async () => {
   console.log(`✅ Bot online as ${client.user.tag}`);
-  // Pre-warm the REST connection so the first deferReply doesn't hit a cold TCP handshake
   await client.application.fetch().catch(() => {});
+  // Keep the REST connection alive so deferReply never hits a cold TCP handshake
+  setInterval(() => client.application.fetch().catch(() => {}), 4 * 60 * 1000);
   runDailyCheck();
   scheduleMidnightCheck();
 });
@@ -89,6 +90,7 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   try {
+    await interaction.deferReply(command.ephemeral === false ? {} : { flags: 64 });
     await command.execute(interaction);
   } catch (err) {
     console.error(err);

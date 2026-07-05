@@ -13,7 +13,6 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: 64 });
 
     const officerRoleId = process.env.DEMERIT_OFFICER_ROLE_ID;
     if (officerRoleId && !interaction.member.roles.cache.has(officerRoleId)) {

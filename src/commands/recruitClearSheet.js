@@ -7,7 +7,6 @@ module.exports = {
     .setDescription("Clear all recruitment tallies for everyone in the Recruitment Department"),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: 64 });
 
     await clearRecruitSheet();
 

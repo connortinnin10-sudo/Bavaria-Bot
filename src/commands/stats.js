@@ -5,9 +5,9 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("my_stats")
     .setDescription("View your regiment stats"),
+  ephemeral: false,
 
   async execute(interaction) {
-    await interaction.deferReply();
 
     const statsRoleId = process.env.STATS_ROLE_ID;
 

@@ -10,7 +10,6 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: 64 });
 
     // Role check (temporarily disabled for testing)
     // if (!interaction.member.roles.cache.has(process.env.RECRUITMENT_ROLE_ID)) {

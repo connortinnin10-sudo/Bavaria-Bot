@@ -7,7 +7,6 @@ module.exports = {
     .setDescription("Clear all demerits for every regiment member"),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: 64 });
 
     const officerRoleId = process.env.DEMERIT_OFFICER_ROLE_ID;
     if (officerRoleId && !interaction.member.roles.cache.has(officerRoleId)) {

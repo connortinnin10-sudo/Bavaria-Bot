@@ -36,7 +36,6 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: 64 });
 
     const recruitmentRoleId = process.env.RECRUITMENT_ROLE_ID;
 
