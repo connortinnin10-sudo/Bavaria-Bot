@@ -90,4 +90,6 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+const token = process.env.DISCORD_TOKEN;
+console.log("[DEBUG] Token length:", token?.length, "| starts with quote:", token?.startsWith('"'));
+client.login(token);
