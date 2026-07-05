@@ -339,9 +339,9 @@ async function promoteUser(userId, newRank) {
   return true;
 }
 
-const ACCOUNTABILITY_TAB = "Accountability";
-const PINK               = { red: 0.918, green: 0.600, blue: 0.600 };
-const CORNFLOWER_BLUE    = { red: 0.788, green: 0.855, blue: 0.973 };
+const ACCOUNTABILITY_TAB  = "Accountability";
+const ACCOUNTABILITY_BLUE = { red: 0.259, green: 0.522, blue: 0.957 };
+const CORNFLOWER_BLUE     = { red: 0.788, green: 0.855, blue: 0.973 };
 const H_COL_IDX          = 7; // column H is index 7 (0-based)
 
 function parseDate(str) {
@@ -424,9 +424,9 @@ async function isOnAccountability(userId) {
   const bg = res.data.sheets?.[0]?.data?.[0]?.rowData?.[0]?.values?.[0]?.userEnteredFormat?.backgroundColor;
   if (!bg) return false;
   return (
-    Math.abs((bg.red   ?? 0) - PINK.red)   < 0.05 &&
-    Math.abs((bg.green ?? 0) - PINK.green) < 0.05 &&
-    Math.abs((bg.blue  ?? 0) - PINK.blue)  < 0.05
+    Math.abs((bg.red   ?? 0) - ACCOUNTABILITY_BLUE.red)   < 0.05 &&
+    Math.abs((bg.green ?? 0) - ACCOUNTABILITY_BLUE.green) < 0.05 &&
+    Math.abs((bg.blue  ?? 0) - ACCOUNTABILITY_BLUE.blue)  < 0.05
   );
 }
 
@@ -436,7 +436,7 @@ async function applyAccountability({ userId, leaveDate, returnDate, reason }) {
   const tabNames = await getTabNames();
   const sheetId  = tabNames[COMPANY_GID[record.company]].sheetId;
 
-  await setCellFormat(sheetId, record.rowNumber, H_COL_IDX, PINK);
+  await setCellFormat(sheetId, record.rowNumber, H_COL_IDX, ACCOUNTABILITY_BLUE);
   await setCellNote(sheetId, record.rowNumber, H_COL_IDX, `Leave: ${leaveDate} | Return: ${returnDate} | Reason: ${reason}`);
 
   const sheets = getSheetsClient();
