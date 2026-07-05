@@ -1,6 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { enlistUser, findUser, findReserveUser, removeReserveUser } = require("../sheets");
-const { getRobloxUsername } = require("../bloxlink");
+const { enlistUser, findUser, parseUsername, findReserveUser, removeReserveUser } = require("../sheets");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -8,6 +7,9 @@ module.exports = {
     .setDescription("Enlist a new recruit into the regiment")
     .addUserOption((opt) =>
       opt.setName("user").setDescription("The recruit to enlist").setRequired(true)
+    )
+    .addStringOption((opt) =>
+      opt.setName("username").setDescription("Their Roblox username").setRequired(true)
     )
     .addStringOption((opt) =>
       opt
@@ -49,14 +51,7 @@ module.exports = {
     const targetUser   = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
     const targetMember = await interaction.guild.members.fetch(targetUser.id);
-
-    const displayName = await getRobloxUsername(targetUser.id);
-    if (!displayName) {
-      return interaction.editReply({
-        content: "❌ This user has not verified their Roblox account with Bloxlink. They must verify before they can be enlisted.",
-      });
-    }
-
+    const displayName  = interaction.options.getString("username").trim();
     const company      = interaction.options.getString("company");
     const timezone     = interaction.options.getString("timezone");
     const rank         = interaction.options.getString("rank");
@@ -104,7 +99,7 @@ module.exports = {
       );
     }
 
-    // Update nickname to [2.] (nickname)
+    // Update nickname to [2.] (username)
     const newNickname = `[2.] ${displayName}`;
     await targetMember.setNickname(newNickname).catch((err) =>
       console.error("Failed to set nickname:", err.message)

@@ -1,6 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findUser, removeUser, removeFromAllDepartments, findReserveUser, reserveUser } = require("../sheets");
-const { getRobloxUsername } = require("../bloxlink");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -8,6 +7,9 @@ module.exports = {
     .setDescription("Move a member to the reserve roster")
     .addUserOption((opt) =>
       opt.setName("user").setDescription("The member to move to reserve").setRequired(true)
+    )
+    .addStringOption((opt) =>
+      opt.setName("username").setDescription("Their Roblox username").setRequired(true)
     )
     .addStringOption((opt) =>
       opt.setName("timezone").setDescription("Their timezone (e.g. EST, GMT+1)").setRequired(true)
@@ -18,18 +20,12 @@ module.exports = {
 
     const targetUser   = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
+    const username     = interaction.options.getString("username").trim();
     const timezone     = interaction.options.getString("timezone").trim();
     const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
     if (!targetMember) {
       return interaction.editReply({ content: "Could not find that member in this server." });
-    }
-
-    const username = await getRobloxUsername(targetUser.id);
-    if (!username) {
-      return interaction.editReply({
-        content: "❌ This user has not verified their Roblox account with Bloxlink. They must verify before they can be moved to reserve.",
-      });
     }
 
     // Block if already on reserve
