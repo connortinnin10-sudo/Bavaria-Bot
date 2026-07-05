@@ -8,25 +8,44 @@ async function getRobloxUsername(discordId) {
   const timeout    = setTimeout(() => controller.abort(), 5000);
 
   try {
+    // Try guild-specific endpoint first
     const res = await fetch(
       `https://api.blox.link/v4/public/guilds/${guildId}/discord-to-roblox/${discordId}`,
       { headers: { "api-key": apiKey }, signal: controller.signal }
     );
 
     const data = await res.json();
-    console.log("[Bloxlink] status:", res.status, "body:", JSON.stringify(data));
+    console.log("[Bloxlink] guild status:", res.status, "body:", JSON.stringify(data));
 
-    if (!res.ok) return null;
+    if (res.ok) {
+      if (data.resolved?.roblox?.name) return data.resolved.roblox.name;
+      if (data.robloxID) {
+        const robloxRes = await fetch(`https://users.roblox.com/v1/users/${data.robloxID}`, { signal: controller.signal });
+        if (robloxRes.ok) {
+          const robloxData = await robloxRes.json();
+          return robloxData.name ?? null;
+        }
+      }
+    }
 
-    if (data.resolved?.roblox?.name) return data.resolved.roblox.name;
-    if (!data.robloxID) return null;
+    // Fall back to global endpoint
+    const globalRes = await fetch(
+      `https://api.blox.link/v4/public/discord-to-roblox/${discordId}`,
+      { headers: { "api-key": apiKey }, signal: controller.signal }
+    );
 
-    // Fall back to Roblox API to get username from ID
-    const robloxRes = await fetch(`https://users.roblox.com/v1/users/${data.robloxID}`, { signal: controller.signal });
+    const globalData = await globalRes.json();
+    console.log("[Bloxlink] global status:", globalRes.status, "body:", JSON.stringify(globalData));
+
+    if (!globalRes.ok) return null;
+    if (globalData.resolved?.roblox?.name) return globalData.resolved.roblox.name;
+    if (!globalData.robloxID) return null;
+
+    const robloxRes = await fetch(`https://users.roblox.com/v1/users/${globalData.robloxID}`, { signal: controller.signal });
     if (!robloxRes.ok) return null;
     const robloxData = await robloxRes.json();
-    console.log("[Roblox] username lookup:", JSON.stringify(robloxData));
     return robloxData.name ?? null;
+
   } catch (err) {
     console.error("[Bloxlink] fetch error:", err.message);
     return null;
