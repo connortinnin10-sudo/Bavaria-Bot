@@ -344,6 +344,15 @@ const ACCOUNTABILITY_BLUE = { red: 0.259, green: 0.522, blue: 0.957 };
 const CORNFLOWER_BLUE     = { red: 0.788, green: 0.855, blue: 0.973 };
 const H_COL_IDX          = 7; // column H is index 7 (0-based)
 
+const DEMERIT_TAB = "Demerits";
+const I_COL_IDX   = 8; // column I is index 8 (0-based)
+const DEMERIT_COLORS = {
+  0: CORNFLOWER_BLUE,
+  1: { red: 0.878, green: 0.400, blue: 0.400 },
+  2: { red: 0.800, green: 0.000, blue: 0.000 },
+  3: { red: 0.600, green: 0.000, blue: 0.000 },
+};
+
 function parseDate(str) {
   const parts = str.split("/");
   if (parts.length !== 3) return null;
@@ -692,4 +701,86 @@ async function removeReserveUser(userId) {
   return true;
 }
 
-module.exports = { enlistUser, removeUser, getStats, findUser, getUserRank, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, updateUserField, getActiveAccountability, isOnAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet };
+async function getOrCreateDemeritTab() {
+  const sheets = getSheetsClient();
+  const meta   = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
+  const existing = meta.data.sheets.find(s => s.properties.title === DEMERIT_TAB);
+  if (existing) return existing.properties;
+  const res = await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: { requests: [{ addSheet: { properties: { title: DEMERIT_TAB } } }] },
+  });
+  tabNameCache = null;
+  return res.data.replies[0].addSheet.properties;
+}
+
+async function getDemeritCount(userId) {
+  const sheets = getSheetsClient();
+  await getOrCreateDemeritTab();
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:A` });
+  const rows = res.data.values ?? [];
+  return rows.filter(r => (r[0] ?? "").toString().trim() === userId.toString()).length;
+}
+
+async function setDemeritColor(userId, count) {
+  const record = await findUser(userId);
+  if (!record) return;
+  const tabNames = await getTabNames();
+  const sheetId  = tabNames[COMPANY_GID[record.company]].sheetId;
+  const color    = DEMERIT_COLORS[Math.min(count, 3)];
+  await setCellFormat(sheetId, record.rowNumber, I_COL_IDX, color);
+}
+
+async function addDemerit(userId, reason, addedBy) {
+  const sheets = getSheetsClient();
+  await getOrCreateDemeritTab();
+  const today  = new Date().toLocaleDateString("en-GB");
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range:         `${DEMERIT_TAB}!A:D`,
+    valueInputOption: "USER_ENTERED",
+    requestBody:   { values: [["'" + userId, reason, today, "'" + addedBy]] },
+  });
+  const count = await getDemeritCount(userId);
+  await setDemeritColor(userId, count);
+  return count;
+}
+
+// Returns new count, or null if user had no demerits
+async function removeDemerit(userId) {
+  const sheets = getSheetsClient();
+  await getOrCreateDemeritTab();
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:D` });
+  const rows = res.data.values ?? [];
+  let lastRowIndex = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if ((rows[i][0] ?? "").toString().trim() === userId.toString()) lastRowIndex = i;
+  }
+  if (lastRowIndex === -1) return null;
+  await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A${lastRowIndex + 1}:D${lastRowIndex + 1}` });
+  const count = await getDemeritCount(userId);
+  await setDemeritColor(userId, count);
+  return count;
+}
+
+// Returns array of affected Discord user IDs
+async function removeAllDemerits() {
+  const sheets = getSheetsClient();
+  await getOrCreateDemeritTab();
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:D` });
+  const rows = res.data.values ?? [];
+
+  const affectedIds = [...new Set(
+    rows.filter(r => (r[0] ?? "").toString().trim()).map(r => r[0].toString().trim())
+  )];
+
+  for (const userId of affectedIds) {
+    await setDemeritColor(userId, 0);
+  }
+  if (rows.length > 0) {
+    await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:D` });
+  }
+  return affectedIds;
+}
+
+module.exports = { enlistUser, removeUser, getStats, findUser, getUserRank, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, updateUserField, getActiveAccountability, isOnAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits };

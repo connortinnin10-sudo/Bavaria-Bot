@@ -14,6 +14,9 @@ const commands = [
   require("./commands/recruitClearSheet").data.toJSON(),
   require("./commands/userAccountability").data.toJSON(),
   require("./commands/userAccountabilityRemove").data.toJSON(),
+  require("./commands/demeritAdd").data.toJSON(),
+  require("./commands/demeritRemove").data.toJSON(),
+  require("./commands/demeritRemoveAll").data.toJSON(),
 ];
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);

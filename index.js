@@ -19,6 +19,9 @@ const commands = [
   require("./src/commands/recruitClearSheet"),
   require("./src/commands/userAccountability"),
   require("./src/commands/userAccountabilityRemove"),
+  require("./src/commands/demeritAdd"),
+  require("./src/commands/demeritRemove"),
+  require("./src/commands/demeritRemoveAll"),
 ];
 
 for (const command of commands) {
