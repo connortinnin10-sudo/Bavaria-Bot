@@ -3,10 +3,10 @@ const { removeAccountability, findUser } = require("../sheets");
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("user_accountability_remove")
-    .setDescription("Remove a member from accountability")
+    .setName("user_loa_remove")
+    .setDescription("Remove a member from LOA")
     .addUserOption((opt) =>
-      opt.setName("user").setDescription("The member to remove from accountability").setRequired(true)
+      opt.setName("user").setDescription("The member to remove from LOA").setRequired(true)
     ),
 
   async execute(interaction) {
@@ -27,7 +27,7 @@ module.exports = {
     }
 
     return interaction.editReply({
-      content: `✅ Accountability removed for **${username}**. Their sheet has been restored.`,
+      content: `✅ LOA removed for **${username}**. Their checkbox has been cleared.`,
     });
   },
 };

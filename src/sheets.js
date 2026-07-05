@@ -8,13 +8,14 @@ const ENLIST_START_ROW   = 21; // write only from row 21
 const ENLIST_END_ROW     = 67;
 
 const COL = {
-  RANK:     { letter: "F", idx: 0 },
-  TIMEZONE: { letter: "G", idx: 1 },
-  NAME:     { letter: "H", idx: 2 },
-  DISCORD:  { letter: "I", idx: 3 },
-  KILLS:    { letter: "J", idx: 4 },
-  KPE:      { letter: "K", idx: 5 },
-  ACTIVITY: { letter: "L", idx: 6 },
+  RANK:     { letter: "G", idx: 0 },
+  TIMEZONE: { letter: "H", idx: 1 },
+  NAME:     { letter: "I", idx: 2 },
+  // J (idx 3) is unused/skipped
+  DISCORD:  { letter: "K", idx: 4 },
+  KILLS:    { letter: "L", idx: 5 },
+  KPE:      { letter: "M", idx: 6 },
+  ACTIVITY: { letter: "N", idx: 7 },
 };
 
 const COMPANY_GID = {
@@ -95,14 +96,14 @@ async function fetchEnlistRows(tabName, startRow = ENLIST_READ_START) {
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: `${tabName}!F${startRow}:L${ENLIST_END_ROW}`,
+    range: `${tabName}!G${startRow}:N${ENLIST_END_ROW}`,
   });
   return res.data.values ?? [];
 }
 
-// A row is available if all target columns (indices 0-3) are empty
+// A row is available if column G (rank, idx 0) is empty
 function isEnlistRowAvailable(row) {
-  return [0, 1, 2, 3].every((i) => (row[i] ?? "").toString().trim() === "");
+  return (row[0] ?? "").toString().trim() === "";
 }
 
 function isDeptRowAvailable(row) {
@@ -123,7 +124,7 @@ async function clearRow(tabName, rowNumber) {
   const sheets = getSheetsClient();
   await sheets.spreadsheets.values.clear({
     spreadsheetId: SHEET_ID,
-    range: `${tabName}!F${rowNumber}:I${rowNumber}`,
+    range: `${tabName}!G${rowNumber}:K${rowNumber}`,
   });
 }
 
@@ -174,7 +175,8 @@ async function enlistUser({ userId, username, company, timezone, rank }) {
   }
   if (targetRowNumber === null) throw new Error("NO_SPACE");
 
-  await writeRow(info.name, "F", "I", targetRowNumber, [rank, timezone, username, userId]);
+  // G=rank, H=timezone, I=name, J=empty, K=discordId
+  await writeRow(info.name, "G", "K", targetRowNumber, [rank, timezone, username, "", "'" + userId]);
 }
 
 async function removeUser(userId) {
@@ -300,10 +302,10 @@ async function promoteUser(userId, newRank) {
 
   const sheets = getSheetsClient();
 
-  // Update rank column (F) on enlist sheet
+  // Update rank column (G) on enlist sheet
   await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
-    range: `${found.tabName}!F${found.rowNumber}`,
+    range: `${found.tabName}!G${found.rowNumber}`,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [[newRank]] },
   });
@@ -339,13 +341,12 @@ async function promoteUser(userId, newRank) {
   return true;
 }
 
-const ACCOUNTABILITY_TAB  = "Accountability";
-const ACCOUNTABILITY_BLUE = { red: 0.259, green: 0.522, blue: 0.957 };
-const CORNFLOWER_BLUE     = { red: 0.788, green: 0.855, blue: 0.973 };
-const H_COL_IDX          = 7; // column H is index 7 (0-based)
+const ACCOUNTABILITY_TAB = "Accountability";
+const J_COL_IDX          = 9;  // column J (LOA checkbox), 0-based absolute index
 
-const DEMERIT_TAB = "Demerits";
-const I_COL_IDX   = 8; // column I is index 8 (0-based)
+const DEMERIT_TAB    = "Demerits";
+const CORNFLOWER_BLUE = { red: 0.788, green: 0.855, blue: 0.973 };
+const K_COL_IDX      = 10; // column K (Discord ID / demerit color), 0-based absolute index
 const DEMERIT_COLORS = {
   0: CORNFLOWER_BLUE,
   1: { red: 0.878, green: 0.400, blue: 0.400 },
@@ -425,18 +426,12 @@ async function isOnAccountability(userId) {
   const record = await findUser(userId);
   if (!record) return false;
   const sheets = getSheetsClient();
-  const res = await sheets.spreadsheets.get({
+  const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    ranges: [`${record.tabName}!H${record.rowNumber}`],
-    includeGridData: true,
+    range: `${record.tabName}!J${record.rowNumber}`,
   });
-  const bg = res.data.sheets?.[0]?.data?.[0]?.rowData?.[0]?.values?.[0]?.userEnteredFormat?.backgroundColor;
-  if (!bg) return false;
-  return (
-    Math.abs((bg.red   ?? 0) - ACCOUNTABILITY_BLUE.red)   < 0.05 &&
-    Math.abs((bg.green ?? 0) - ACCOUNTABILITY_BLUE.green) < 0.05 &&
-    Math.abs((bg.blue  ?? 0) - ACCOUNTABILITY_BLUE.blue)  < 0.05
-  );
+  const val = (res.data.values?.[0]?.[0] ?? "").toString().toUpperCase();
+  return val === "TRUE";
 }
 
 async function applyAccountability({ userId, leaveDate, returnDate, reason }) {
@@ -444,11 +439,18 @@ async function applyAccountability({ userId, leaveDate, returnDate, reason }) {
   if (!record) return null;
   const tabNames = await getTabNames();
   const sheetId  = tabNames[COMPANY_GID[record.company]].sheetId;
+  const sheets   = getSheetsClient();
 
-  await setCellFormat(sheetId, record.rowNumber, H_COL_IDX, ACCOUNTABILITY_BLUE);
-  await setCellNote(sheetId, record.rowNumber, H_COL_IDX, `Leave: ${leaveDate} | Return: ${returnDate} | Reason: ${reason}`);
+  // Set LOA checkbox (column J) to TRUE
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${record.tabName}!J${record.rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [["TRUE"]] },
+  });
+  // Add note to the checkbox cell
+  await setCellNote(sheetId, record.rowNumber, J_COL_IDX, `Leave: ${leaveDate} | Return: ${returnDate} | Reason: ${reason}`);
 
-  const sheets = getSheetsClient();
   await getOrCreateAccountabilityTab();
   await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
@@ -473,8 +475,14 @@ async function removeAccountability(userId) {
     const current = await findUser(userId);
     if (current) {
       const sheetId = tabNames[COMPANY_GID[current.company]].sheetId;
-      await setCellFormat(sheetId, current.rowNumber, H_COL_IDX, CORNFLOWER_BLUE);
-      await setCellNote(sheetId, current.rowNumber, H_COL_IDX, "");
+      // Set LOA checkbox (column J) back to FALSE
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID,
+        range: `${current.tabName}!J${current.rowNumber}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [["FALSE"]] },
+      });
+      await setCellNote(sheetId, current.rowNumber, J_COL_IDX, "");
     }
     await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:F${i + 1}` });
     break;
@@ -501,8 +509,13 @@ async function clearExpiredAccountabilities() {
     const current = await findUser(userId);
     if (current) {
       const sheetId = tabNames[COMPANY_GID[current.company]].sheetId;
-      await setCellFormat(sheetId, current.rowNumber, H_COL_IDX, CORNFLOWER_BLUE);
-      await setCellNote(sheetId, current.rowNumber, H_COL_IDX, "");
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID,
+        range: `${current.tabName}!J${current.rowNumber}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [["FALSE"]] },
+      });
+      await setCellNote(sheetId, current.rowNumber, J_COL_IDX, "");
     }
     await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:F${i + 1}` });
     cleared++;
@@ -517,14 +530,14 @@ async function updateUserField({ record, field, newValue, oldUsername }) {
   if (field === "timezone") {
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
-      range: `${record.tabName}!G${record.rowNumber}`,
+      range: `${record.tabName}!H${record.rowNumber}`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [[newValue]] },
     });
   } else if (field === "username") {
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
-      range: `${record.tabName}!H${record.rowNumber}`,
+      range: `${record.tabName}!I${record.rowNumber}`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [[newValue]] },
     });
@@ -554,7 +567,7 @@ async function updateUserField({ record, field, newValue, oldUsername }) {
   } else if (field === "discordId") {
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
-      range: `${record.tabName}!I${record.rowNumber}`,
+      range: `${record.tabName}!K${record.rowNumber}`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [[newValue]] },
     });
@@ -728,7 +741,7 @@ async function setDemeritColor(userId, count) {
   const tabNames = await getTabNames();
   const sheetId  = tabNames[COMPANY_GID[record.company]].sheetId;
   const color    = DEMERIT_COLORS[Math.min(count, 3)];
-  await setCellFormat(sheetId, record.rowNumber, I_COL_IDX, color);
+  await setCellFormat(sheetId, record.rowNumber, K_COL_IDX, color);
 }
 
 async function addDemerit(userId, reason, addedBy) {

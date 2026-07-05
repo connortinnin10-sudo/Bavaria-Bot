@@ -12,10 +12,10 @@ function parseDate(str) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("user_accountability")
-    .setDescription("Place a member on accountability")
+    .setName("user_loa")
+    .setDescription("Place a member on LOA")
     .addUserOption((opt) =>
-      opt.setName("user").setDescription("The member to place on accountability").setRequired(true)
+      opt.setName("user").setDescription("The member to place on LOA").setRequired(true)
     )
     .addStringOption((opt) =>
       opt.setName("leave_date").setDescription("Leave date — D/M/YY (e.g. 6/7/26)").setRequired(true)
@@ -67,14 +67,14 @@ module.exports = {
     const existing = await getActiveAccountability(targetUser.id);
     if (existing) {
       return interaction.editReply({
-        content: `❌ **${username}** already has an active accountability. Use \`/user_accountability_remove\` to clear it first.`,
+        content: `❌ **${username}** already has an active LOA. Use \`/user_loa_remove\` to clear it first.`,
       });
     }
 
     await applyAccountability({ userId: targetUser.id, leaveDate, returnDate, reason });
 
     return interaction.editReply({
-      content: `✅ **${username}** has been placed on accountability.\n> **Leave:** ${leaveDate}\n> **Return:** ${returnDate}\n> **Reason:** ${reason}`,
+      content: `✅ **${username}** has been placed on LOA.\n> **Leave:** ${leaveDate}\n> **Return:** ${returnDate}\n> **Reason:** ${reason}`,
     });
   },
 };
