@@ -743,7 +743,9 @@ async function setDemeritCell(userId, count) {
   const sheetId  = tabNames[COMPANY_GID[record.company]].sheetId;
   const color    = DEMERIT_COLORS[Math.min(count, 3)];
   const note     = count > 0 ? `Demerit ${count}` : "";
-  await setCellFormat(sheetId, record.rowNumber, I_COL_IDX, color);
+  await setCellFormat(sheetId, record.rowNumber, I_COL_IDX, color).catch(err =>
+    console.error("[demerit] setCellFormat failed:", err.message)
+  );
   await setCellNote(sheetId, record.rowNumber, I_COL_IDX, note).catch(err =>
     console.error("[demerit] setCellNote failed:", err.message)
   );

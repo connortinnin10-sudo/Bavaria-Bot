@@ -78,15 +78,6 @@ client.on("interactionCreate", async (interaction) => {
     return interaction.reply({ content: "❌ You do not have permission to use this command.", flags: 64 });
   }
 
-  // Block if the target user doesn't have the verified role (cache only — no network call before deferReply)
-  const targetUser = interaction.options.getUser("user");
-  if (targetUser && verifiedRoleId) {
-    const targetMember = interaction.guild.members.cache.get(targetUser.id);
-    if (targetMember && !targetMember.roles.cache.has(verifiedRoleId)) {
-      return interaction.reply({ content: "❌ That user does not have the verified role and cannot be targeted by this command.", flags: 64 });
-    }
-  }
-
   try {
     await interaction.deferReply(command.ephemeral === false ? {} : { flags: 64 });
     await command.execute(interaction);
