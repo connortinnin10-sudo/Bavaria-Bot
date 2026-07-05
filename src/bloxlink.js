@@ -2,6 +2,8 @@ async function getRobloxUsername(discordId) {
   const guildId = process.env.DISCORD_GUILD_ID;
   const apiKey  = process.env.BLOXLINK_API_KEY;
 
+  console.log("[Bloxlink] apiKey present:", !!apiKey, "| length:", apiKey?.length, "| guildId:", guildId);
+
   const controller = new AbortController();
   const timeout    = setTimeout(() => controller.abort(), 5000);
 
