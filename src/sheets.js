@@ -344,6 +344,7 @@ async function promoteUser(userId, newRank) {
 const ACCOUNTABILITY_TAB = "Accountability";
 const J_COL_IDX          = 9;  // column J (LOA checkbox), 0-based absolute index
 
+const DEMERIT_GID    = 958952891;
 const DEMERIT_TAB    = "Demerits";
 const CORNFLOWER_BLUE = { red: 0.788, green: 0.855, blue: 0.973 };
 const I_COL_IDX      = 8; // column I (name/nickname, demerit color), 0-based absolute index
@@ -445,7 +446,7 @@ async function applyAccountability({ userId, leaveDate, returnDate, reason }) {
   await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
     range: `${record.tabName}!J${record.rowNumber}`,
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     requestBody: { values: [[true]] },
   });
   // Add note to the checkbox cell
@@ -479,7 +480,7 @@ async function removeAccountability(userId) {
       await sheets.spreadsheets.values.update({
         spreadsheetId: SHEET_ID,
         range: `${current.tabName}!J${current.rowNumber}`,
-        valueInputOption: "USER_ENTERED",
+        valueInputOption: "RAW",
         requestBody: { values: [[false]] },
       });
       await setCellNote(sheetId, current.rowNumber, J_COL_IDX, "");
@@ -512,7 +513,7 @@ async function clearExpiredAccountabilities() {
       await sheets.spreadsheets.values.update({
         spreadsheetId: SHEET_ID,
         range: `${current.tabName}!J${current.rowNumber}`,
-        valueInputOption: "USER_ENTERED",
+        valueInputOption: "RAW",
         requestBody: { values: [[false]] },
       });
       await setCellNote(sheetId, current.rowNumber, J_COL_IDX, "");
