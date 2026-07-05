@@ -7,7 +7,7 @@ module.exports = {
     .setDescription("View your regiment stats"),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: 64 });
+    await interaction.deferReply();
 
     const statsRoleId = process.env.STATS_ROLE_ID;
 
