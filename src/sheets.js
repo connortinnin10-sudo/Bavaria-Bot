@@ -4,8 +4,8 @@ require("dotenv").config();
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 
 const ENLIST_READ_START  = 15; // read from row 15 (includes all command/officer rows)
-const ENLIST_START_ROW   = 21; // write only from row 21
-const ENLIST_END_ROW     = 67;
+const ENLIST_START_ROW   = 23; // write only from row 23
+const ENLIST_END_ROW     = 68;
 
 const COL = {
   RANK:     { letter: "G", idx: 0 },
