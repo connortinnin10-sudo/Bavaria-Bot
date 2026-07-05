@@ -52,6 +52,8 @@ const DEPARTMENTS = {
 };
 
 let tabNameCache = null;
+let _auth = null;
+let _sheetsClient = null;
 
 async function getTabNames() {
   if (tabNameCache) return tabNameCache;
@@ -69,17 +71,23 @@ async function getTabNames() {
 }
 
 function getAuth() {
-  return new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key:  process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-    },
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
+  if (!_auth) {
+    _auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key:  process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+      },
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+  }
+  return _auth;
 }
 
 function getSheetsClient() {
-  return google.sheets({ version: "v4", auth: getAuth() });
+  if (!_sheetsClient) {
+    _sheetsClient = google.sheets({ version: "v4", auth: getAuth() });
+  }
+  return _sheetsClient;
 }
 
 // Strip [2.], ignore anything in quotes, ignore anything after a comma
@@ -716,10 +724,10 @@ async function removeReserveUser(userId) {
 }
 
 async function getOrCreateDemeritTab() {
+  const tabNames = await getTabNames();
+  const existing = Object.values(tabNames).find(t => t.name === DEMERIT_TAB);
+  if (existing) return existing;
   const sheets = getSheetsClient();
-  const meta   = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
-  const existing = meta.data.sheets.find(s => s.properties.title === DEMERIT_TAB);
-  if (existing) return existing.properties;
   const res = await sheets.spreadsheets.batchUpdate({
     spreadsheetId: SHEET_ID,
     requestBody: { requests: [{ addSheet: { properties: { title: DEMERIT_TAB } } }] },
@@ -765,7 +773,7 @@ async function addDemerit(userId, reason, addedBy) {
   console.log(`[demerit] append ok, counting`);
   const count = await getDemeritCount(userId);
   console.log(`[demerit] count=${count}, coloring`);
-  await setDemeritCell(userId, count);
+  await setDemeritCell(userId, count).catch(err => console.error("[demerit] setDemeritCell failed:", err.message));
   console.log(`[demerit] done`);
   return count;
 }
@@ -783,7 +791,7 @@ async function removeDemerit(userId) {
   if (lastRowIndex === -1) return null;
   await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A${lastRowIndex + 1}:D${lastRowIndex + 1}` });
   const count = await getDemeritCount(userId);
-  await setDemeritCell(userId, count);
+  await setDemeritCell(userId, count).catch(err => console.error("[demerit] setDemeritCell failed:", err.message));
   return count;
 }
 
@@ -799,7 +807,7 @@ async function removeAllDemerits() {
   )];
 
   for (const userId of affectedIds) {
-    await setDemeritCell(userId, 0);
+    await setDemeritCell(userId, 0).catch(err => console.error("[demerit] setDemeritCell failed:", err.message));
   }
   if (rows.length > 0) {
     await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:D` });
