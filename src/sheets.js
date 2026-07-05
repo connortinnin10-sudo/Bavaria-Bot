@@ -350,9 +350,9 @@ const CORNFLOWER_BLUE = { red: 0.788, green: 0.855, blue: 0.973 };
 const I_COL_IDX      = 8; // column I (name/nickname, demerit color), 0-based absolute index
 const DEMERIT_COLORS = {
   0: CORNFLOWER_BLUE,
-  1: { red: 0.878, green: 0.400, blue: 0.400 },
-  2: { red: 0.800, green: 0.000, blue: 0.000 },
-  3: { red: 0.600, green: 0.000, blue: 0.000 },
+  1: { red: 0.957, green: 0.800, blue: 0.800 }, // light red (#F4CCCC)
+  2: { red: 0.878, green: 0.000, blue: 0.000 }, // normal red (#E00000)
+  3: { red: 0.698, green: 0.000, blue: 0.000 }, // dark red, still readable (#B20000)
 };
 
 function parseDate(str) {
