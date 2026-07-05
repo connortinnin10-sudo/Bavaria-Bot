@@ -57,6 +57,22 @@ client.on("interactionCreate", async (interaction) => {
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
 
+  const verifiedRoleId = process.env.VERIFIED_ROLE_ID;
+
+  // Block command executor if they don't have the verified role
+  if (verifiedRoleId && !interaction.member.roles.cache.has(verifiedRoleId)) {
+    return interaction.reply({ content: "❌ You do not have permission to use this command.", flags: 64 });
+  }
+
+  // Block if the target user doesn't have the verified role
+  const targetUser = interaction.options.getUser("user");
+  if (targetUser && verifiedRoleId) {
+    const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+    if (targetMember && !targetMember.roles.cache.has(verifiedRoleId)) {
+      return interaction.reply({ content: "❌ That user does not have the verified role and cannot be targeted by this command.", flags: 64 });
+    }
+  }
+
   try {
     await command.execute(interaction);
   } catch (err) {
