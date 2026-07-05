@@ -57,6 +57,9 @@ client.once("ready", () => {
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
+  // Discard stale interactions replayed after a bot restart
+  if (Date.now() - interaction.createdTimestamp > 2500) return;
+
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
 
