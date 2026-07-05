@@ -52,24 +52,30 @@ module.exports = {
     await targetUser.send(dmLines.join("\n")).catch(() => null);
 
     if (newCount >= 3) {
-      const rolesToRemove = [
-        process.env.ROLE_REGIMENT,
-        process.env.ROLE_PREMIER_CORPS,
-        process.env.ROLE_GRANDE_ARMEE,
-        process.env.ROLE_BAYREUTH,
-        process.env.ROLE_ROSENHEIM,
-      ].filter(Boolean);
-      for (const roleId of rolesToRemove) {
-        await targetMember.roles.remove(roleId).catch(err =>
-          console.error(`Failed to remove role ${roleId}:`, err.message)
-        );
-      }
+      console.log(`[demerit] 3-demerit threshold reached for ${targetUser.id}, swapping roles`);
+      try {
+        const rolesToRemove = [
+          process.env.ROLE_REGIMENT,
+          process.env.ROLE_PREMIER_CORPS,
+          process.env.ROLE_GRANDE_ARMEE,
+          process.env.ROLE_BAYREUTH,
+          process.env.ROLE_ROSENHEIM,
+        ].filter(Boolean);
+        for (const roleId of rolesToRemove) {
+          await targetMember.roles.remove(roleId).catch(err =>
+            console.error(`Failed to remove role ${roleId}:`, err.message)
+          );
+        }
 
-      const reserveRoles = (process.env.BAVARIAN_RESERVE_ROLES ?? "").split(",").map(r => r.trim()).filter(Boolean);
-      for (const roleId of reserveRoles) {
-        await targetMember.roles.add(roleId).catch(err =>
-          console.error(`Failed to add role ${roleId}:`, err.message)
-        );
+        const reserveRoles = (process.env.BAVARIAN_RESERVE_ROLES ?? "").split(",").map(r => r.trim()).filter(Boolean);
+        for (const roleId of reserveRoles) {
+          await targetMember.roles.add(roleId).catch(err =>
+            console.error(`Failed to add role ${roleId}:`, err.message)
+          );
+        }
+        console.log(`[demerit] role swap complete`);
+      } catch (swapErr) {
+        console.error(`[demerit] role swap threw:`, swapErr);
       }
     }
 

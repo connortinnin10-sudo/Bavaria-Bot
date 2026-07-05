@@ -346,13 +346,13 @@ const J_COL_IDX          = 9;  // column J (LOA checkbox), 0-based absolute inde
 
 const DEMERIT_GID    = 958952891;
 const DEMERIT_TAB    = "Demerits";
-const CORNFLOWER_BLUE = { red: 0.788, green: 0.855, blue: 0.973 };
+const CORNFLOWER_BLUE = { red: 0.788, green: 0.859, blue: 0.973 }; // #c9dbf8
 const I_COL_IDX      = 8; // column I (name/nickname, demerit color), 0-based absolute index
 const DEMERIT_COLORS = {
   0: CORNFLOWER_BLUE,
-  1: { red: 0.957, green: 0.800, blue: 0.800 }, // light red (#F4CCCC)
-  2: { red: 0.878, green: 0.000, blue: 0.000 }, // normal red (#E00000)
-  3: { red: 0.698, green: 0.000, blue: 0.000 }, // dark red, still readable (#B20000)
+  1: { red: 0.918, green: 0.600, blue: 0.600 }, // #ea9999
+  2: { red: 0.875, green: 0.400, blue: 0.396 }, // #df6665
+  3: { red: 0.800, green: 0.004, blue: 0.000 }, // #cc0100
 };
 
 function parseDate(str) {
@@ -736,13 +736,15 @@ async function getDemeritCount(userId) {
   return rows.filter(r => (r[0] ?? "").toString().trim() === userId.toString()).length;
 }
 
-async function setDemeritColor(userId, count) {
+async function setDemeritCell(userId, count) {
   const record = await findUser(userId);
   if (!record) return;
   const tabNames = await getTabNames();
   const sheetId  = tabNames[COMPANY_GID[record.company]].sheetId;
   const color    = DEMERIT_COLORS[Math.min(count, 3)];
+  const note     = count > 0 ? `Demerit ${count}` : "";
   await setCellFormat(sheetId, record.rowNumber, I_COL_IDX, color);
+  await setCellNote(sheetId, record.rowNumber, I_COL_IDX, note);
 }
 
 async function addDemerit(userId, reason, addedBy) {
@@ -759,7 +761,7 @@ async function addDemerit(userId, reason, addedBy) {
   console.log(`[demerit] append ok, counting`);
   const count = await getDemeritCount(userId);
   console.log(`[demerit] count=${count}, coloring`);
-  await setDemeritColor(userId, count);
+  await setDemeritCell(userId, count);
   console.log(`[demerit] done`);
   return count;
 }
@@ -777,7 +779,7 @@ async function removeDemerit(userId) {
   if (lastRowIndex === -1) return null;
   await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A${lastRowIndex + 1}:D${lastRowIndex + 1}` });
   const count = await getDemeritCount(userId);
-  await setDemeritColor(userId, count);
+  await setDemeritCell(userId, count);
   return count;
 }
 
@@ -793,7 +795,7 @@ async function removeAllDemerits() {
   )];
 
   for (const userId of affectedIds) {
-    await setDemeritColor(userId, 0);
+    await setDemeritCell(userId, 0);
   }
   if (rows.length > 0) {
     await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:D` });
