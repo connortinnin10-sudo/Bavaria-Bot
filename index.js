@@ -48,16 +48,24 @@ function scheduleMidnightCheck() {
   }, msUntilMidnight);
 }
 
-client.once("ready", () => {
+client.once("ready", async () => {
   console.log(`✅ Bot online as ${client.user.tag}`);
+  // Pre-warm the REST connection so the first deferReply doesn't hit a cold TCP handshake
+  await client.application.fetch().catch(() => {});
   runDailyCheck();
   scheduleMidnightCheck();
 });
 
+const handledInteractions = new Set();
+
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
-  // Discard stale interactions replayed after a bot restart
+  // Deduplicate replayed interactions (gateway resume can replay the same ID)
+  if (handledInteractions.has(interaction.id)) return;
+  handledInteractions.add(interaction.id);
+
+  // Discard stale interactions (expired before we could respond)
   if (Date.now() - interaction.createdTimestamp > 2500) return;
 
   const command = client.commands.get(interaction.commandName);
@@ -83,6 +91,7 @@ client.on("interactionCreate", async (interaction) => {
     await command.execute(interaction);
   } catch (err) {
     console.error(err);
+    if (err?.code === 10062) return; // interaction expired — nothing to reply to
     try {
       const msg = { content: "An error occurred. Please try again.", flags: 64 };
       if (interaction.deferred || interaction.replied) {
