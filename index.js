@@ -1,3 +1,6 @@
+const { setDefaultResultOrder } = require("dns");
+setDefaultResultOrder("ipv4first"); // prevent IPv6 fallback delay on Railway
+
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const { clearExpiredAccountabilities } = require("./src/sheets");
 require("dotenv").config();
