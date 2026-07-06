@@ -812,9 +812,42 @@ async function getDemeritCount(userId) {
   return rows.filter(r => (r[0] ?? "").toString().trim() === userId.toString()).length;
 }
 
-async function setDemeritCell() {
-  // batchUpdate (cell color/note) corrupts Node's OpenSSL state on Railway.
-  // Demerit state is tracked in the Demerits tab — visual updates disabled.
+async function setDemeritCell(userId, count) {
+  const found = await findUser(userId);
+  if (!found) return;
+
+  const sheets  = getSheetsClient();
+  const color   = DEMERIT_COLORS[Math.min(count, 3)] ?? DEMERIT_COLORS[0];
+  const rowIdx  = found.rowNumber - 1; // 0-based for batchUpdate
+
+  let note = "";
+  if (count > 0) {
+    const res      = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:B` });
+    const userRows = (res.data.values ?? []).filter(r => (r[0] ?? "").toString().trim() === userId.toString());
+    note = userRows.map((r, i) => `Demerit ${i + 1} | Reason: ${(r[1] ?? "").toString()}`).join("\n");
+  }
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: {
+      requests: [
+        {
+          repeatCell: {
+            range: { sheetId: found.sheetId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: I_COL_IDX, endColumnIndex: I_COL_IDX + 1 },
+            cell: { userEnteredFormat: { backgroundColor: color } },
+            fields: "userEnteredFormat.backgroundColor",
+          },
+        },
+        {
+          updateCells: {
+            range: { sheetId: found.sheetId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: I_COL_IDX, endColumnIndex: I_COL_IDX + 1 },
+            rows: [{ values: [{ note }] }],
+            fields: "note",
+          },
+        },
+      ],
+    },
+  });
 }
 
 async function addDemerit(userId, reason, addedBy) {

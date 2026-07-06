@@ -39,7 +39,7 @@ module.exports = {
     if (newCount >= 3) {
       dmText = [
         `⚠️ You have received demerit **3/3** for: *${reason}*`,
-        `Your 3/3 demerits are pending removal from the regiment. To contest this, DM <@${interaction.user.id}>.`,
+        `You've received 3/3 demerits. You're currently pending to be transferred to the regiment's reserve company. To contest this, contact <@${interaction.user.id}>.`,
       ].join("\n");
     } else {
       dmText = [
