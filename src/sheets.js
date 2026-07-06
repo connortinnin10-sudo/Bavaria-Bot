@@ -40,9 +40,9 @@ const DEPARTMENTS = {
   },
   "Propaganda Department": {
     startRow: 18, endRow: 27,
-    rankCol: "G", nameCol: "H",
+    rankCol: "H", nameCol: "I",
     rankIdx: 0,   nameIdx: 1,
-    fetchRange: (s, e) => `G${s}:H${e}`,
+    fetchRange: (s, e) => `H${s}:I${e}`,
   },
   "Flag Department": {
     startRow: 18, endRow: 39,
