@@ -36,8 +36,8 @@ module.exports = {
     }
 
     const dmText = newCount === 0
-      ? `✅ A demerit has been removed for: *${reason}*. You now have no demerits.`
-      : `✅ A demerit has been removed for: *${reason}*. You are now at **${newCount}/3** demerits.`;
+      ? `✅ A demerit has been removed by <@${interaction.user.id}> for: *${reason}*. You now have no demerits.`
+      : `✅ A demerit has been removed by <@${interaction.user.id}> for: *${reason}*. You are now at **${newCount}/3** demerits.`;
     await targetUser.send(dmText).catch(() => null);
 
     return interaction.editReply({
