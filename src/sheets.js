@@ -472,6 +472,11 @@ async function applyAccountability({ userId, leaveDate, returnDate, reason, offi
     });
   }
 
+  // Always add a note to the checkbox cell so the LOA info is visible in the sheet
+  await setCellNote(record.sheetId, record.rowNumber, J_COL_IDX, `LOA | Leave: ${leaveDate} | Return: ${returnDate} | Reason: ${reason}`).catch(err => {
+    console.error("[accountability] setCellNote failed:", err.message);
+  });
+
   await getOrCreateAccountabilityTab();
   await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
@@ -498,6 +503,9 @@ async function removeAccountability(userId) {
         range: `${current.tabName}!J${current.rowNumber}`,
         valueInputOption: "RAW",
         requestBody: { values: [[false]] },
+      });
+      await setCellNote(current.sheetId, current.rowNumber, J_COL_IDX, "").catch(err => {
+        console.error("[accountability] setCellNote failed:", err.message);
       });
     }
     await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:G${i + 1}` });
@@ -536,6 +544,9 @@ async function clearExpiredAccountabilities() {
           range: `${current.tabName}!J${current.rowNumber}`,
           valueInputOption: "RAW",
           requestBody: { values: [[false]] },
+        });
+        await setCellNote(current.sheetId, current.rowNumber, J_COL_IDX, "").catch(err => {
+          console.error("[accountability] setCellNote failed:", err.message);
         });
       }
       await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:G${i + 1}` });
