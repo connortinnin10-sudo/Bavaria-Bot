@@ -46,9 +46,9 @@ const DEPARTMENTS = {
   },
   "Flag Department": {
     startRow: 18, endRow: 39,
-    rankCol: "K", nameCol: "L",
+    rankCol: "L", nameCol: "M",
     rankIdx: 0,   nameIdx: 1,
-    fetchRange: (s, e) => `K${s}:L${e}`,
+    fetchRange: (s, e) => `L${s}:M${e}`,
   },
 };
 
