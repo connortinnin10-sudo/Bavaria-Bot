@@ -70,7 +70,11 @@ module.exports = {
       });
     }
 
-    await applyAccountability({ userId: targetUser.id, leaveDate, returnDate, reason });
+    const result = await applyAccountability({ userId: targetUser.id, leaveDate, returnDate, reason, officerId: interaction.user.id });
+
+    if (result?.isToday) {
+      await targetUser.send(`✅ Your LOA is now active.\n> **Leave:** ${leaveDate}\n> **Return:** ${returnDate}\n> **Reason:** ${reason}`).catch(() => null);
+    }
 
     return interaction.editReply({
       content: `✅ **${username}** has been placed on LOA.\n> **Leave:** ${leaveDate}\n> **Return:** ${returnDate}\n> **Reason:** ${reason}`,

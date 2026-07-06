@@ -431,7 +431,7 @@ async function setCellNote(sheetId, rowNumber, colIdx, note) {
 async function getActiveAccountability(userId) {
   const sheets = getSheetsClient();
   await getOrCreateAccountabilityTab();
-  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A:F` });
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A:G` });
   const rows = res.data.values ?? [];
   for (const row of rows) {
     if (!(row[0] ?? "").toString().trim()) continue;
@@ -453,102 +453,120 @@ async function isOnAccountability(userId) {
   return val === "TRUE";
 }
 
-async function applyAccountability({ userId, leaveDate, returnDate, reason }) {
-  const record   = await findUser(userId);
+async function applyAccountability({ userId, leaveDate, returnDate, reason, officerId }) {
+  const record = await findUser(userId);
   if (!record) return null;
-  const tabNames = await getTabNames();
-  const sheetId  = tabNames[COMPANY_GID[record.company]].sheetId;
-  const sheets   = getSheetsClient();
+  const sheets = getSheetsClient();
 
-  // Set LOA checkbox (column J) to TRUE
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SHEET_ID,
-    range: `${record.tabName}!J${record.rowNumber}`,
-    valueInputOption: "RAW",
-    requestBody: { values: [[true]] },
-  });
-  // Add note to the checkbox cell
-  await setCellNote(sheetId, record.rowNumber, J_COL_IDX, `Leave: ${leaveDate} | Return: ${returnDate} | Reason: ${reason}`).catch(err => {
-    _auth = null;
-    console.error("[accountability] setCellNote failed:", err.message);
-  });
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const leave = parseDate(leaveDate);
+  const isToday = leave !== null && leave.getTime() === today.getTime();
+
+  // Only flip checkbox TRUE now if the leave date is today
+  if (isToday) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `${record.tabName}!J${record.rowNumber}`,
+      valueInputOption: "RAW",
+      requestBody: { values: [[true]] },
+    });
+  }
 
   await getOrCreateAccountabilityTab();
   await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
-    range: `${ACCOUNTABILITY_TAB}!A:F`,
+    range: `${ACCOUNTABILITY_TAB}!A:G`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [["'" + userId, record.tabName, record.rowNumber, leaveDate, returnDate, reason]] },
+    requestBody: { values: [["'" + userId, record.tabName, record.rowNumber, leaveDate, returnDate, reason, (officerId ?? "").toString()]] },
   });
-  return record;
+  return { record, isToday };
 }
 
 async function removeAccountability(userId) {
-  const sheets   = getSheetsClient();
+  const sheets = getSheetsClient();
   await getOrCreateAccountabilityTab();
-  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A:F` });
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A:G` });
   const rows = res.data.values ?? [];
-  const tabNames = await getTabNames();
 
-  let found = false;
   for (let i = 0; i < rows.length; i++) {
     if ((rows[i][0] ?? "").toString().trim() !== userId.toString()) continue;
-    found = true;
+    const rowData = rows[i];
     const current = await findUser(userId);
     if (current) {
-      const sheetId = tabNames[COMPANY_GID[current.company]].sheetId;
-      // Set LOA checkbox (column J) back to FALSE
       await sheets.spreadsheets.values.update({
         spreadsheetId: SHEET_ID,
         range: `${current.tabName}!J${current.rowNumber}`,
         valueInputOption: "RAW",
         requestBody: { values: [[false]] },
       });
-      await setCellNote(sheetId, current.rowNumber, J_COL_IDX, "").catch(err => {
-        _auth = null;
-        console.error("[accountability] setCellNote failed:", err.message);
-      });
     }
-    await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:F${i + 1}` });
-    break;
+    await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:G${i + 1}` });
+    return rowData;
   }
-  return found;
+  return null;
 }
 
 async function clearExpiredAccountabilities() {
   const sheets = getSheetsClient();
   await getOrCreateAccountabilityTab();
-  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A:F` });
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A:G` });
   const rows = res.data.values ?? [];
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const tabNames = await getTabNames();
-  let cleared = 0;
+
+  const activated   = [];
+  const deactivated = [];
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     if (!(row[0] ?? "")) continue;
-    const ret = parseDate(row[4] ?? "");
-    if (!ret || ret >= today) continue;
 
-    const userId  = row[0];
-    const current = await findUser(userId);
-    if (current) {
-      const sheetId = tabNames[COMPANY_GID[current.company]].sheetId;
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SHEET_ID,
-        range: `${current.tabName}!J${current.rowNumber}`,
-        valueInputOption: "RAW",
-        requestBody: { values: [[false]] },
-      });
-      await setCellNote(sheetId, current.rowNumber, J_COL_IDX, "").catch(err => {
-        _auth = null;
-        console.error("[accountability] setCellNote failed:", err.message);
-      });
+    const userId     = (row[0] ?? "").toString().trim();
+    const leaveDate  = (row[3] ?? "").toString().trim();
+    const returnDate = (row[4] ?? "").toString().trim();
+    const officerId  = (row[6] ?? "").toString().trim();
+    const leave = parseDate(leaveDate);
+    const ret   = parseDate(returnDate);
+
+    if (ret && ret < today) {
+      // Return date passed — deactivate and clear row
+      const current = await findUser(userId);
+      if (current) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SHEET_ID,
+          range: `${current.tabName}!J${current.rowNumber}`,
+          valueInputOption: "RAW",
+          requestBody: { values: [[false]] },
+        });
+      }
+      await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:G${i + 1}` });
+      deactivated.push({ userId });
+    } else if (leave && leave.getTime() === today.getTime()) {
+      // Leave date is today — activate and DM
+      const current = await findUser(userId);
+      if (current) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SHEET_ID,
+          range: `${current.tabName}!J${current.rowNumber}`,
+          valueInputOption: "RAW",
+          requestBody: { values: [[true]] },
+        });
+      }
+      activated.push({ userId, leaveDate, returnDate, officerId });
+    } else if (leave && leave < today) {
+      // Leave date passed but return date not yet — bot missed midnight, activate silently
+      const current = await findUser(userId);
+      if (current) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SHEET_ID,
+          range: `${current.tabName}!J${current.rowNumber}`,
+          valueInputOption: "RAW",
+          requestBody: { values: [[true]] },
+        });
+      }
     }
-    await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:F${i + 1}` });
-    cleared++;
   }
-  return cleared;
+
+  return { activated, deactivated };
 }
 
 async function updateUserField({ record, field, newValue, oldUsername }) {

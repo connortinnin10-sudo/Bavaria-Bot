@@ -35,31 +35,59 @@ for (const command of commands) {
   client.commands.set(command.data.name, command);
 }
 
-async function runDailyCheck() {
+function msUntilEstMidnight() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric", minute: "numeric", second: "numeric",
+    hour12: false,
+  }).formatToParts(new Date());
+  const p = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  const elapsed = (parseInt(p.hour, 10) % 24) * 3600000 +
+                  parseInt(p.minute, 10) * 60000 +
+                  parseInt(p.second, 10) * 1000;
+  return 24 * 60 * 60 * 1000 - elapsed;
+}
+
+async function runDailyCheck(client) {
   try {
-    const cleared = await clearExpiredAccountabilities();
-    if (cleared > 0) console.log(`Cleared ${cleared} expired accountability record(s).`);
+    const { activated, deactivated } = await clearExpiredAccountabilities();
+    const delay = ms => new Promise(r => setTimeout(r, ms));
+
+    for (const entry of activated) {
+      try {
+        const user = await client.users.fetch(entry.userId);
+        await user.send(`✅ Your LOA is now active.\n> **Leave:** ${entry.leaveDate}\n> **Return:** ${entry.returnDate}`);
+      } catch {}
+      await delay(500);
+    }
+
+    for (const entry of deactivated) {
+      try {
+        const user = await client.users.fetch(entry.userId);
+        await user.send("✅ Your LOA has ended — welcome back!");
+      } catch {}
+      await delay(500);
+    }
+
+    if (activated.length > 0)   console.log(`Activated ${activated.length} LOA(s).`);
+    if (deactivated.length > 0) console.log(`Cleared ${deactivated.length} expired LOA(s).`);
   } catch (err) {
     console.error("Accountability check error:", err.message);
   }
 }
 
-function scheduleMidnightCheck() {
-  const now = new Date();
-  const next = new Date();
-  next.setHours(24, 0, 0, 0); // next midnight
-  const msUntilMidnight = next - now;
-  setTimeout(() => {
-    runDailyCheck();
-    setInterval(runDailyCheck, 24 * 60 * 60 * 1000);
-  }, msUntilMidnight);
+function scheduleMidnightCheck(client) {
+  setTimeout(async () => {
+    await runDailyCheck(client);
+    scheduleMidnightCheck(client);
+  }, msUntilEstMidnight());
 }
 
 client.once("ready", async () => {
   console.log(`✅ Bot online as ${client.user.tag}`);
   await client.application.fetch().catch(() => {});
-  runDailyCheck();
-  scheduleMidnightCheck();
+  runDailyCheck(client);
+  scheduleMidnightCheck(client);
 });
 
 const handledInteractions = new Set();
