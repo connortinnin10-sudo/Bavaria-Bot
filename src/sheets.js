@@ -733,12 +733,18 @@ async function getOrCreateDemeritTab() {
   const existing = Object.values(tabNames).find(t => t.name === DEMERIT_TAB);
   if (existing) return existing;
   const sheets = getSheetsClient();
-  const res = await sheets.spreadsheets.batchUpdate({
-    spreadsheetId: SHEET_ID,
-    requestBody: { requests: [{ addSheet: { properties: { title: DEMERIT_TAB } } }] },
-  });
-  tabNameCache = null;
-  return res.data.replies[0].addSheet.properties;
+  try {
+    const res = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SHEET_ID,
+      requestBody: { requests: [{ addSheet: { properties: { title: DEMERIT_TAB } } }] },
+    });
+    tabNameCache = null;
+    return res.data.replies[0].addSheet.properties;
+  } catch (err) {
+    _auth = null;
+    console.error("[demerit] failed to create Demerits tab:", err.message);
+    return null;
+  }
 }
 
 async function getDemeritCount(userId) {
@@ -749,20 +755,9 @@ async function getDemeritCount(userId) {
   return rows.filter(r => (r[0] ?? "").toString().trim() === userId.toString()).length;
 }
 
-async function setDemeritCell(userId, count) {
-  const record = await findUser(userId);
-  if (!record) return;
-  const tabNames = await getTabNames();
-  const sheetId  = tabNames[COMPANY_GID[record.company]].sheetId;
-  const color    = DEMERIT_COLORS[Math.min(count, 3)];
-  const note     = count >= 3 ? "Demerit 3 - Pending Removal" : count > 0 ? `Demerit ${count}` : "";
-  try {
-    await setCellFormat(sheetId, record.rowNumber, I_COL_IDX, color);
-    await setCellNote(sheetId, record.rowNumber, I_COL_IDX, note);
-  } catch (err) {
-    _auth = null;
-    console.error("[demerit] batchUpdate failed:", err.message);
-  }
+async function setDemeritCell() {
+  // batchUpdate (cell color/note) corrupts Node's OpenSSL state on Railway.
+  // Demerit state is tracked in the Demerits tab — visual updates disabled.
 }
 
 async function addDemerit(userId, reason, addedBy) {
