@@ -1,6 +1,5 @@
 const { google } = require("googleapis");
 const crypto = require("crypto");
-const https  = require("https");
 require("dotenv").config();
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
@@ -53,70 +52,39 @@ const DEPARTMENTS = {
   },
 };
 
-let tabNameCache  = null;
-let _tokenCache   = null;
-let _tokenExpiry  = 0;
+let tabNameCache = null;
+let _auth        = null;
 
-function _postForm(url, params) {
-  const body = Object.entries(params)
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
-  return new Promise((resolve, reject) => {
-    const req = https.request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "Content-Length": Buffer.byteLength(body) },
-    }, (res) => {
-      let data = "";
-      res.on("data", c => data += c);
-      res.on("end", () => { try { resolve(JSON.parse(data)); } catch (e) { reject(new Error(data)); } });
+// Railway sometimes strips newlines from env vars, leaving the PEM as one long line.
+// This re-wraps the base64 body at 64 chars so OpenSSL can parse it.
+function normalizePrivateKey(raw) {
+  const pem = (raw || "").replace(/\\n/g, "\n");
+  const m   = pem.match(/(-+BEGIN PRIVATE KEY-+)([\s\S]*?)(-+END PRIVATE KEY-+)/);
+  if (!m) return pem;
+  const body = m[2].replace(/\s+/g, "").match(/.{1,64}/g)?.join("\n") ?? "";
+  return `${m[1]}\n${body}\n${m[3]}\n`;
+}
+
+function getAuth() {
+  if (!_auth) {
+    _auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key:  normalizePrivateKey(process.env.GOOGLE_PRIVATE_KEY),
+      },
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
-    req.on("error", reject);
-    req.write(body);
-    req.end();
-  });
+  }
+  return _auth;
 }
 
-async function getAccessToken() {
-  if (_tokenCache && Date.now() < _tokenExpiry) return _tokenCache;
-
-  const key   = (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const now   = Math.floor(Date.now() / 1000);
-
-  const hdr = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
-  const pld = Buffer.from(JSON.stringify({
-    iss: email,
-    scope: "https://www.googleapis.com/auth/spreadsheets",
-    aud: "https://oauth2.googleapis.com/token",
-    exp: now + 3600,
-    iat: now,
-  })).toString("base64url");
-
-  const signer = crypto.createSign("RSA-SHA256");
-  signer.update(`${hdr}.${pld}`);
-  const sig = signer.sign(key, "base64url");
-  const jwt = `${hdr}.${pld}.${sig}`;
-
-  const data = await _postForm("https://oauth2.googleapis.com/token", {
-    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-    assertion: jwt,
-  });
-  if (!data.access_token) throw new Error(`Auth failed: ${data.error} — ${data.error_description}`);
-
-  _tokenCache  = data.access_token;
-  _tokenExpiry = Date.now() + (data.expires_in - 300) * 1000;
-  return _tokenCache;
-}
-
-async function getSheetsClient() {
-  const token = await getAccessToken();
-  const auth  = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: token });
-  return google.sheets({ version: "v4", auth });
+function getSheetsClient() {
+  return google.sheets({ version: "v4", auth: getAuth() });
 }
 
 async function getTabNames() {
   if (tabNameCache) return tabNameCache;
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
   const cache = {};
   for (const s of meta.data.sheets) {
@@ -141,7 +109,7 @@ function parseUsername(rawNickname) {
 }
 
 async function fetchEnlistRows(tabName, startRow = ENLIST_READ_START) {
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: `${tabName}!G${startRow}:N${ENLIST_END_ROW}`,
@@ -159,7 +127,7 @@ function isDeptRowAvailable(row) {
 }
 
 async function writeRow(tabName, startCol, endCol, rowNumber, values) {
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
     range: `${tabName}!${startCol}${rowNumber}:${endCol}${rowNumber}`,
@@ -169,7 +137,7 @@ async function writeRow(tabName, startCol, endCol, rowNumber, values) {
 }
 
 async function clearRow(tabName, rowNumber) {
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   await sheets.spreadsheets.values.clear({
     spreadsheetId: SHEET_ID,
     range: `${tabName}!G${rowNumber}:K${rowNumber}`,
@@ -257,7 +225,7 @@ async function addToDepartment({ userId, department, rank, username }) {
   const dept = DEPARTMENTS[department];
   if (!dept) throw new Error(`Unknown department: ${department}`);
 
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: `${deptTab.name}!${dept.fetchRange(dept.startRow, dept.endRow)}`,
@@ -285,7 +253,7 @@ async function removeFromAllDepartments(username) {
   const deptTab  = tabNames[DEPT_GID];
   if (!deptTab) return;
 
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   for (const [deptName, dept] of Object.entries(DEPARTMENTS)) {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
@@ -315,7 +283,7 @@ async function removeFromDepartment({ name, department }) {
   const dept = DEPARTMENTS[department];
   if (!dept) throw new Error(`Unknown department: ${department}`);
 
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: `${deptTab.name}!${dept.fetchRange(dept.startRow, dept.endRow)}`,
@@ -348,7 +316,7 @@ async function promoteUser(userId, newRank) {
   const found = await findUser(userId);
   if (!found) return false;
 
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
 
   // Update rank column (G) on enlist sheet
   await sheets.spreadsheets.values.update({
@@ -414,7 +382,7 @@ function parseDate(str) {
 }
 
 async function getOrCreateAccountabilityTab() {
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   const meta   = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
   const existing = meta.data.sheets.find(s => s.properties.title === ACCOUNTABILITY_TAB);
   if (existing) return existing.properties;
@@ -427,7 +395,7 @@ async function getOrCreateAccountabilityTab() {
 }
 
 async function setCellFormat(sheetId, rowNumber, colIdx, backgroundColor) {
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: SHEET_ID,
     requestBody: {
@@ -443,7 +411,7 @@ async function setCellFormat(sheetId, rowNumber, colIdx, backgroundColor) {
 }
 
 async function setCellNote(sheetId, rowNumber, colIdx, note) {
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: SHEET_ID,
     requestBody: {
@@ -459,7 +427,7 @@ async function setCellNote(sheetId, rowNumber, colIdx, note) {
 }
 
 async function getActiveAccountability(userId) {
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   await getOrCreateAccountabilityTab();
   const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A:F` });
   const rows = res.data.values ?? [];
@@ -474,7 +442,7 @@ async function getActiveAccountability(userId) {
 async function isOnAccountability(userId) {
   const record = await findUser(userId);
   if (!record) return false;
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: `${record.tabName}!J${record.rowNumber}`,
@@ -546,7 +514,7 @@ async function removeAccountability(userId) {
 }
 
 async function clearExpiredAccountabilities() {
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   await getOrCreateAccountabilityTab();
   const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A:F` });
   const rows = res.data.values ?? [];
@@ -637,7 +605,7 @@ async function incrementRecruitCount(username) {
   const deptTab  = tabNames[DEPT_GID];
   if (!deptTab) throw new Error("Department tab not found");
 
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: `${deptTab.name}!D16:E30`,
@@ -673,7 +641,7 @@ async function decrementRecruitCount(username) {
   const deptTab  = tabNames[DEPT_GID];
   if (!deptTab) throw new Error("Department tab not found");
 
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: `${deptTab.name}!D16:E30`,
@@ -709,7 +677,7 @@ async function clearRecruitSheet() {
   const deptTab  = tabNames[DEPT_GID];
   if (!deptTab) throw new Error("Department tab not found");
 
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   await sheets.spreadsheets.values.clear({
     spreadsheetId: SHEET_ID,
     range: `${deptTab.name}!E16:E30`,
@@ -720,7 +688,7 @@ async function fetchReserveRows() {
   const tabNames = await getTabNames();
   const info     = tabNames[RESERVE_GID];
   if (!info) throw new Error("Reserve sheet tab not found");
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: `${info.name}!F${RESERVE_START}:H${RESERVE_END}`,
@@ -740,7 +708,7 @@ async function findReserveUser(userId) {
 
 async function reserveUser({ userId, timezone, username }) {
   const { rows, tabName } = await fetchReserveRows();
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
 
   let targetRow = null;
   const maxRows = RESERVE_END - RESERVE_START + 1;
@@ -764,7 +732,7 @@ async function reserveUser({ userId, timezone, username }) {
 async function removeReserveUser(userId) {
   const found = await findReserveUser(userId);
   if (!found) return false;
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   await sheets.spreadsheets.values.clear({
     spreadsheetId: SHEET_ID,
     range: `${found.tabName}!F${found.rowNumber}:H${found.rowNumber}`,
@@ -776,7 +744,7 @@ async function getOrCreateDemeritTab() {
   const tabNames = await getTabNames();
   const existing = Object.values(tabNames).find(t => t.name === DEMERIT_TAB);
   if (existing) return existing;
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   try {
     const res = await sheets.spreadsheets.batchUpdate({
       spreadsheetId: SHEET_ID,
@@ -792,7 +760,7 @@ async function getOrCreateDemeritTab() {
 }
 
 async function getDemeritCount(userId) {
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   await getOrCreateDemeritTab();
   const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:D` });
   const rows = res.data.values ?? [];
@@ -805,7 +773,7 @@ async function setDemeritCell() {
 }
 
 async function addDemerit(userId, reason, addedBy) {
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   await getOrCreateDemeritTab();
   const today = new Date().toLocaleDateString("en-GB");
   await sheets.spreadsheets.values.append({
@@ -821,7 +789,7 @@ async function addDemerit(userId, reason, addedBy) {
 
 // Returns new count, or null if user had no active demerits
 async function removeDemerit(userId) {
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   await getOrCreateDemeritTab();
   const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:D` });
   const rows = res.data.values ?? [];
@@ -847,7 +815,7 @@ async function removeDemerit(userId) {
 
 // Returns array of affected Discord user IDs
 async function removeAllDemerits() {
-  const sheets = await getSheetsClient();
+  const sheets = getSheetsClient();
   await getOrCreateDemeritTab();
   const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:D` });
   const rows = res.data.values ?? [];
