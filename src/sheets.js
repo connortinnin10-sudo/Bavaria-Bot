@@ -539,7 +539,7 @@ async function clearExpiredAccountabilities() {
         });
       }
       await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:G${i + 1}` });
-      deactivated.push({ userId });
+      deactivated.push({ userId, leaveDate, returnDate });
     } else if (leave && leave.getTime() === today.getTime()) {
       // Leave date is today — activate only if checkbox not already TRUE
       const current = await findUser(userId);

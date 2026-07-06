@@ -56,7 +56,8 @@ async function runDailyCheck(client) {
     for (const entry of activated) {
       try {
         const user = await client.users.fetch(entry.userId);
-        await user.send(`✅ Your LOA is now active.\n> **Leave:** ${entry.leaveDate}\n> **Return:** ${entry.returnDate}`);
+        const approvedBy = entry.officerId ? `\n> **Approved by:** <@${entry.officerId}>` : "";
+        await user.send(`✅ Your LOA is now active.\n> **Leave:** ${entry.leaveDate}\n> **Return:** ${entry.returnDate}${approvedBy}`);
       } catch {}
       await delay(500);
     }
@@ -64,7 +65,7 @@ async function runDailyCheck(client) {
     for (const entry of deactivated) {
       try {
         const user = await client.users.fetch(entry.userId);
-        await user.send("✅ Your LOA has ended — welcome back!");
+        await user.send(`Your LOA from ${entry.leaveDate} to ${entry.returnDate} has ended.`);
       } catch {}
       await delay(500);
     }

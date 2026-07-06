@@ -73,7 +73,7 @@ module.exports = {
     const result = await applyAccountability({ userId: targetUser.id, leaveDate, returnDate, reason, officerId: interaction.user.id });
 
     if (result?.isToday) {
-      await targetUser.send(`✅ Your LOA is now active.\n> **Leave:** ${leaveDate}\n> **Return:** ${returnDate}\n> **Reason:** ${reason}`).catch(() => null);
+      await targetUser.send(`✅ Your LOA is now active.\n> **Leave:** ${leaveDate}\n> **Return:** ${returnDate}\n> **Reason:** ${reason}\n> **Approved by:** <@${interaction.user.id}>`).catch(() => null);
     }
 
     return interaction.editReply({

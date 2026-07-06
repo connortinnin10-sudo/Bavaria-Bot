@@ -28,9 +28,7 @@ module.exports = {
       });
     }
 
-    const officerId     = (rowData[6] ?? "").toString().trim();
-    const officerMention = officerId ? `<@${officerId}>` : "an officer";
-    await targetUser.send(`Your LOA has been removed for: *${reason}* by ${officerMention}.`).catch(() => null);
+    await targetUser.send(`Your LOA has been removed.\n> **Reason:** ${reason}\n> **Removed by:** <@${interaction.user.id}>`).catch(() => null);
 
     return interaction.editReply({
       content: `✅ LOA removed for **${username}**.\n> **Reason:** ${reason}`,
