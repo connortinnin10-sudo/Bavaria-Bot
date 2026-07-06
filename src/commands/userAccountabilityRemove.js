@@ -16,7 +16,7 @@ module.exports = {
     const targetUser = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
 
-    const reason  = interaction.options.getString("reason").trim();
+    const reason  = (interaction.options.getString("reason") ?? "").trim();
     const record  = await findUser(targetUser.id);
     const username = record ? (record.rowData[2] ?? targetUser.username).toString().trim() : targetUser.username;
 
