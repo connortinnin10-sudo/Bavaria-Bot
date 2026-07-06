@@ -454,9 +454,10 @@ async function applyAccountability({ userId, leaveDate, returnDate, reason }) {
     requestBody: { values: [[true]] },
   });
   // Add note to the checkbox cell
-  await setCellNote(sheetId, record.rowNumber, J_COL_IDX, `Leave: ${leaveDate} | Return: ${returnDate} | Reason: ${reason}`).catch(err =>
-    console.error("[accountability] setCellNote failed:", err.message)
-  );
+  await setCellNote(sheetId, record.rowNumber, J_COL_IDX, `Leave: ${leaveDate} | Return: ${returnDate} | Reason: ${reason}`).catch(err => {
+    _auth = null;
+    console.error("[accountability] setCellNote failed:", err.message);
+  });
 
   await getOrCreateAccountabilityTab();
   await sheets.spreadsheets.values.append({
@@ -489,9 +490,10 @@ async function removeAccountability(userId) {
         valueInputOption: "RAW",
         requestBody: { values: [[false]] },
       });
-      await setCellNote(sheetId, current.rowNumber, J_COL_IDX, "").catch(err =>
-        console.error("[accountability] setCellNote failed:", err.message)
-      );
+      await setCellNote(sheetId, current.rowNumber, J_COL_IDX, "").catch(err => {
+        _auth = null;
+        console.error("[accountability] setCellNote failed:", err.message);
+      });
     }
     await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:F${i + 1}` });
     break;
@@ -524,9 +526,10 @@ async function clearExpiredAccountabilities() {
         valueInputOption: "RAW",
         requestBody: { values: [[false]] },
       });
-      await setCellNote(sheetId, current.rowNumber, J_COL_IDX, "").catch(err =>
-        console.error("[accountability] setCellNote failed:", err.message)
-      );
+      await setCellNote(sheetId, current.rowNumber, J_COL_IDX, "").catch(err => {
+        _auth = null;
+        console.error("[accountability] setCellNote failed:", err.message);
+      });
     }
     await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:F${i + 1}` });
     cleared++;
@@ -753,12 +756,14 @@ async function setDemeritCell(userId, count) {
   const sheetId  = tabNames[COMPANY_GID[record.company]].sheetId;
   const color    = DEMERIT_COLORS[Math.min(count, 3)];
   const note     = count >= 3 ? "Demerit 3 - Pending Removal" : count > 0 ? `Demerit ${count}` : "";
-  await setCellFormat(sheetId, record.rowNumber, I_COL_IDX, color).catch(err =>
-    console.error("[demerit] setCellFormat failed:", err.message)
-  );
-  await setCellNote(sheetId, record.rowNumber, I_COL_IDX, note).catch(err =>
-    console.error("[demerit] setCellNote failed:", err.message)
-  );
+  await setCellFormat(sheetId, record.rowNumber, I_COL_IDX, color).catch(err => {
+    _auth = null;
+    console.error("[demerit] setCellFormat failed:", err.message);
+  });
+  await setCellNote(sheetId, record.rowNumber, I_COL_IDX, note).catch(err => {
+    _auth = null;
+    console.error("[demerit] setCellNote failed:", err.message);
+  });
 }
 
 async function addDemerit(userId, reason, addedBy) {
