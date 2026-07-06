@@ -231,6 +231,8 @@ async function addToDepartment({ userId, department, rank, username }) {
     range: `${deptTab.name}!${dept.fetchRange(dept.startRow, dept.endRow)}`,
   });
   const rows = res.data.values ?? [];
+  console.log(`[dept] ${department} — fetched ${rows.length} rows from ${dept.fetchRange(dept.startRow, dept.endRow)}`);
+  rows.forEach((r, i) => console.log(`[dept] row ${dept.startRow + i}:`, JSON.stringify(r)));
 
   let targetRowNumber = null;
   for (let i = 0; i < (dept.endRow - dept.startRow + 1); i++) {
