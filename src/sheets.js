@@ -541,27 +541,41 @@ async function clearExpiredAccountabilities() {
       await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A${i + 1}:G${i + 1}` });
       deactivated.push({ userId });
     } else if (leave && leave.getTime() === today.getTime()) {
-      // Leave date is today — activate and DM
+      // Leave date is today — activate only if checkbox not already TRUE
       const current = await findUser(userId);
       if (current) {
-        await sheets.spreadsheets.values.update({
+        const checkRes = await sheets.spreadsheets.values.get({
           spreadsheetId: SHEET_ID,
           range: `${current.tabName}!J${current.rowNumber}`,
-          valueInputOption: "RAW",
-          requestBody: { values: [[true]] },
         });
+        const alreadyActive = (checkRes.data.values?.[0]?.[0] ?? "").toString().toUpperCase() === "TRUE";
+        if (!alreadyActive) {
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: SHEET_ID,
+            range: `${current.tabName}!J${current.rowNumber}`,
+            valueInputOption: "RAW",
+            requestBody: { values: [[true]] },
+          });
+          activated.push({ userId, leaveDate, returnDate, officerId });
+        }
       }
-      activated.push({ userId, leaveDate, returnDate, officerId });
     } else if (leave && leave < today) {
       // Leave date passed but return date not yet — bot missed midnight, activate silently
       const current = await findUser(userId);
       if (current) {
-        await sheets.spreadsheets.values.update({
+        const checkRes = await sheets.spreadsheets.values.get({
           spreadsheetId: SHEET_ID,
           range: `${current.tabName}!J${current.rowNumber}`,
-          valueInputOption: "RAW",
-          requestBody: { values: [[true]] },
         });
+        const alreadyActive = (checkRes.data.values?.[0]?.[0] ?? "").toString().toUpperCase() === "TRUE";
+        if (!alreadyActive) {
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: SHEET_ID,
+            range: `${current.tabName}!J${current.rowNumber}`,
+            valueInputOption: "RAW",
+            requestBody: { values: [[true]] },
+          });
+        }
       }
     }
   }
