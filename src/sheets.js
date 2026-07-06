@@ -735,12 +735,9 @@ async function getOrCreateDemeritTab() {
 async function getDemeritCount(userId) {
   const sheets = getSheetsClient();
   await getOrCreateDemeritTab();
-  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:E` });
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:D` });
   const rows = res.data.values ?? [];
-  return rows.filter(r =>
-    (r[0] ?? "").toString().trim() === userId.toString() &&
-    (r[4] ?? "").toString().trim() !== "FALSE"
-  ).length;
+  return rows.filter(r => (r[0] ?? "").toString().trim() === userId.toString()).length;
 }
 
 async function setDemeritCell(userId, count) {
@@ -764,9 +761,9 @@ async function addDemerit(userId, reason, addedBy) {
   const today = new Date().toLocaleDateString("en-GB");
   await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
-    range:         `${DEMERIT_TAB}!A:E`,
+    range:         `${DEMERIT_TAB}!A:D`,
     valueInputOption: "RAW",
-    requestBody:   { values: [[userId.toString(), reason, today, addedBy.toString(), "TRUE"]] },
+    requestBody:   { values: [[userId.toString(), reason, today, addedBy.toString()]] },
   });
   const count = await getDemeritCount(userId);
   await setDemeritCell(userId, count).catch(err => console.error("[demerit] setDemeritCell failed:", err.message));
@@ -777,22 +774,22 @@ async function addDemerit(userId, reason, addedBy) {
 async function removeDemerit(userId) {
   const sheets = getSheetsClient();
   await getOrCreateDemeritTab();
-  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:E` });
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:D` });
   const rows = res.data.values ?? [];
 
-  let lastActiveIndex = -1;
+  // FIFO: find the oldest (first) demerit row for this user and clear its content
+  let firstIndex = -1;
   for (let i = 0; i < rows.length; i++) {
-    const rowUserId = (rows[i][0] ?? "").toString().trim();
-    const active    = (rows[i][4] ?? "").toString().trim() !== "FALSE";
-    if (rowUserId === userId.toString() && active) lastActiveIndex = i;
+    if ((rows[i][0] ?? "").toString().trim() === userId.toString()) {
+      firstIndex = i;
+      break;
+    }
   }
-  if (lastActiveIndex === -1) return null;
+  if (firstIndex === -1) return null;
 
-  await sheets.spreadsheets.values.update({
+  await sheets.spreadsheets.values.clear({
     spreadsheetId: SHEET_ID,
-    range:         `${DEMERIT_TAB}!E${lastActiveIndex + 1}`,
-    valueInputOption: "RAW",
-    requestBody:   { values: [["FALSE"]] },
+    range: `${DEMERIT_TAB}!A${firstIndex + 1}:D${firstIndex + 1}`,
   });
   const count = await getDemeritCount(userId);
   await setDemeritCell(userId, count).catch(err => console.error("[demerit] setDemeritCell failed:", err.message));
@@ -803,20 +800,18 @@ async function removeDemerit(userId) {
 async function removeAllDemerits() {
   const sheets = getSheetsClient();
   await getOrCreateDemeritTab();
-  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:E` });
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:D` });
   const rows = res.data.values ?? [];
 
   const affectedIds = [...new Set(
-    rows
-      .filter(r => (r[0] ?? "").toString().trim() && (r[4] ?? "").toString().trim() !== "FALSE")
-      .map(r => r[0].toString().trim())
+    rows.filter(r => (r[0] ?? "").toString().trim()).map(r => r[0].toString().trim())
   )];
 
   for (const userId of affectedIds) {
     await setDemeritCell(userId, 0).catch(err => console.error("[demerit] setDemeritCell failed:", err.message));
   }
   if (rows.length > 0) {
-    await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:E` });
+    await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${DEMERIT_TAB}!A:D` });
   }
   return affectedIds;
 }
