@@ -35,41 +35,19 @@ module.exports = {
     const newCount = await addDemerit(targetUser.id, reason, interaction.user.id);
     const username = (record.rowData[2] ?? targetUser.username).toString();
 
-    const dmLines = [
-      `⚠️ You have received demerit **${newCount}/3** for: *${reason}*`,
-      `To contest this demerit, contact <@${interaction.user.id}>.`,
-    ];
+    let dmText;
     if (newCount >= 3) {
-      dmLines.push(`🔴 You have reached 3 demerits and have been moved to the Bavarian reserve.`);
+      dmText = [
+        `⚠️ You have received demerit **3/3** for: *${reason}*`,
+        `Your 3/3 demerits are pending removal from the regiment. To contest this, DM <@${interaction.user.id}>.`,
+      ].join("\n");
+    } else {
+      dmText = [
+        `⚠️ You have received demerit **${newCount}/3** for: *${reason}*`,
+        `To contest this demerit, contact <@${interaction.user.id}>.`,
+      ].join("\n");
     }
-    await targetUser.send(dmLines.join("\n")).catch(() => null);
-
-    if (newCount >= 3) {
-      const targetMember = interaction.guild.members.cache.get(targetUser.id)
-        ?? await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-
-      if (targetMember) {
-        const rolesToRemove = [
-          process.env.ROLE_REGIMENT,
-          process.env.ROLE_PREMIER_CORPS,
-          process.env.ROLE_GRANDE_ARMEE,
-          process.env.ROLE_BAYREUTH,
-          process.env.ROLE_ROSENHEIM,
-        ].filter(Boolean);
-        for (const roleId of rolesToRemove) {
-          await targetMember.roles.remove(roleId).catch(err =>
-            console.error(`Failed to remove role ${roleId}:`, err.message)
-          );
-        }
-
-        const reserveRoles = (process.env.BAVARIAN_RESERVE_ROLES ?? "").split(",").map(r => r.trim()).filter(Boolean);
-        for (const roleId of reserveRoles) {
-          await targetMember.roles.add(roleId).catch(err =>
-            console.error(`Failed to add role ${roleId}:`, err.message)
-          );
-        }
-      }
-    }
+    await targetUser.send(dmText).catch(() => null);
 
     return interaction.editReply({
       content: `✅ Demerit issued to **${username}**.\n> **Demerits:** ${newCount}/3\n> **Reason:** ${reason}`,
