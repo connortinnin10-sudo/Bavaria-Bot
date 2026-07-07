@@ -191,8 +191,28 @@ async function enlistUser({ userId, username, company, timezone, rank }) {
   }
   if (targetRowNumber === null) throw new Error("NO_SPACE");
 
-  // G=rank, H=timezone, I=name, J=empty, K=discordId
-  await writeRow(info.name, "G", "K", targetRowNumber, [rank, timezone, username, "", "'" + userId]);
+  // G=rank, H=timezone, I=name, J=checkbox(LOA), K=discordId
+  await writeRow(info.name, "G", "K", targetRowNumber, [rank, timezone, username, false, "'" + userId]);
+
+  // Insert checkbox validation on column J so the LOA toggle works
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: {
+      requests: [{
+        setDataValidation: {
+          range: {
+            sheetId:          info.sheetId,
+            startRowIndex:    targetRowNumber - 1,
+            endRowIndex:      targetRowNumber,
+            startColumnIndex: 9, // column J
+            endColumnIndex:   10,
+          },
+          rule: { condition: { type: "BOOLEAN" }, strict: true },
+        },
+      }],
+    },
+  });
 }
 
 async function removeUser(userId) {
