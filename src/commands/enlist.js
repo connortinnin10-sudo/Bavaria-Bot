@@ -98,6 +98,10 @@ module.exports = {
       );
     }
 
+    await targetMember.roles.remove(process.env.GUEST_ROLE).catch((err) =>
+      console.error("Failed to remove guest role:", err.message)
+    );
+
     // Update nickname to [2.] (username)
     const newNickname = `[2.] ${displayName}`;
     await targetMember.setNickname(newNickname).catch((err) =>
