@@ -76,11 +76,20 @@ module.exports = {
     }
 
     // Assign roles
+    const RANK_ROLES = {
+      "Soldat":             process.env.RANK_ROLE_SOLDAT,
+      "Soldat de Premier":  process.env.RANK_ROLE_SOLDAT_DE_PREMIER,
+      "Caporal":            process.env.RANK_ROLE_CAPORAL,
+      "Caporal de Premier": process.env.RANK_ROLE_CAPORAL_DE_PREMIER,
+      "Caporal-Fourrier":   process.env.RANK_ROLE_CAPORAL_FOURRIER,
+    };
+
     const rolesToAdd = [
       process.env.ROLE_REGIMENT,
       process.env.ROLE_PREMIER_CORPS,
       process.env.ROLE_GRANDE_ARMEE,
       company === "Bayreuth" ? process.env.ROLE_BAYREUTH : process.env.ROLE_ROSENHEIM,
+      RANK_ROLES[rank],
     ].filter(Boolean);
 
     for (const roleId of rolesToAdd) {
