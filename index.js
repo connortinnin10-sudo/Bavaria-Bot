@@ -98,6 +98,20 @@ client.once("ready", async () => {
   console.log("[ranks] RANK_ROLE_CAPORAL_DE_PREMIER:", process.env.RANK_ROLE_CAPORAL_DE_PREMIER ?? "MISSING");
   console.log("[ranks] RANK_ROLE_CAPORAL_FOURRIER:", process.env.RANK_ROLE_CAPORAL_FOURRIER ?? "MISSING");
   await client.application.fetch().catch(() => {});
+
+  // Pre-populate the guild's role cache so member.roles.cache is never missing a role
+  if (process.env.DISCORD_GUILD_ID) {
+    try {
+      const guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID);
+      await guild.roles.fetch();
+      console.log(`[startup] Guild roles cached (${guild.roles.cache.size} roles)`);
+    } catch (err) {
+      console.error("[startup] Failed to pre-fetch guild roles:", err.message);
+    }
+  } else {
+    console.warn("[startup] DISCORD_GUILD_ID not set — role cache not pre-populated");
+  }
+
   runDailyCheck(client);
   scheduleMidnightCheck(client);
 });
