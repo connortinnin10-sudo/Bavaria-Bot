@@ -47,6 +47,8 @@ module.exports = {
     ),
 
   async execute(interaction) {
+    console.log(`[perm:rank_change] member roles: ${[...interaction.member.roles.cache.keys()].join(",")}`);
+    console.log(`[perm:rank_change] ROLE_PETIT_ETAT_MAJOR=${process.env.ROLE_PETIT_ETAT_MAJOR} ROLE_ETAT_MAJOR=${process.env.ROLE_ETAT_MAJOR}`);
 
     if (!hasAnyRole(interaction.member, process.env.ROLE_PETIT_ETAT_MAJOR, process.env.ROLE_ETAT_MAJOR)) {
       return interaction.editReply({ content: "❌ You do not have permission to use this command." });

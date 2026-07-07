@@ -11,6 +11,8 @@ module.exports = {
     ),
 
   async execute(interaction) {
+    console.log(`[perm:recruit_remove] member roles: ${[...interaction.member.roles.cache.keys()].join(",")}`);
+    console.log(`[perm:recruit_remove] ROLE_RECRUITMENT=${process.env.ROLE_RECRUITMENT} ROLE_ETAT_MAJOR=${process.env.ROLE_ETAT_MAJOR}`);
 
     if (!hasAnyRole(interaction.member, process.env.ROLE_RECRUITMENT, process.env.ROLE_ETAT_MAJOR)) {
       return interaction.editReply({ content: "❌ You do not have permission to use this command." });
