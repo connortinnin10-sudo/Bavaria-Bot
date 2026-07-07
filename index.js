@@ -109,13 +109,6 @@ client.on("interactionCreate", async (interaction) => {
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
 
-  const verifiedRoleId = process.env.VERIFIED_ROLE_ID;
-
-  // Block command executor if they don't have the verified role
-  if (verifiedRoleId && !interaction.member.roles.cache.has(verifiedRoleId)) {
-    return interaction.reply({ content: "❌ You do not have permission to use this command.", flags: 64 });
-  }
-
   try {
     await interaction.deferReply(command.ephemeral === false ? {} : { flags: 64 });
     await command.execute(interaction);
