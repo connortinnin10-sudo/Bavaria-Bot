@@ -16,6 +16,7 @@ const PROTECTED_RANKS = new Set([
 ]);
 
 const RANK_ROLES = {
+  "Conscript":          process.env.RANK_ROLE_CONSCRIPT,
   "Soldat":             process.env.RANK_ROLE_SOLDAT,
   "Soldat de Premier":  process.env.RANK_ROLE_SOLDAT_DE_PREMIER,
   "Caporal":            process.env.RANK_ROLE_CAPORAL,
@@ -36,6 +37,7 @@ module.exports = {
         .setDescription("New rank to assign")
         .setRequired(true)
         .addChoices(
+          { name: "Conscript",          value: "Conscript"          },
           { name: "Soldat",             value: "Soldat"             },
           { name: "Soldat de Premier",  value: "Soldat de Premier"  },
           { name: "Caporal",            value: "Caporal"            },
