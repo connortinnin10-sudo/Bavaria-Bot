@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { removeAllDemerits } = require("../sheets");
+const { hasAnyRole } = require("../permissions");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -8,8 +9,7 @@ module.exports = {
 
   async execute(interaction) {
 
-    const officerRoleId = process.env.DEMERIT_OFFICER_ROLE_ID;
-    if (officerRoleId && !interaction.member.roles.cache.has(officerRoleId)) {
+    if (!hasAnyRole(interaction.member, process.env.ROLE_ETAT_MAJOR)) {
       return interaction.editReply({ content: "❌ You do not have permission to use this command." });
     }
 

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { promoteUser, findUser } = require("../sheets");
+const { hasAnyRole } = require("../permissions");
 
 const PROTECTED_RANKS = new Set([
   "Sergent",
@@ -44,6 +45,10 @@ module.exports = {
     ),
 
   async execute(interaction) {
+
+    if (!hasAnyRole(interaction.member, process.env.ROLE_PETIT_ETAT_MAJOR, process.env.ROLE_ETAT_MAJOR)) {
+      return interaction.editReply({ content: "❌ You do not have permission to use this command." });
+    }
 
     const targetUser   = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { removeUser, findUser, parseUsername, removeFromAllDepartments, getActiveAccountability, removeAccountability } = require("../sheets");
+const { hasAnyRole } = require("../permissions");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -11,10 +12,9 @@ module.exports = {
 
   async execute(interaction) {
 
-    // Role check (temporarily disabled for testing)
-    // if (!interaction.member.roles.cache.has(process.env.RECRUITMENT_ROLE_ID)) {
-    //   return interaction.editReply("You do not have permission to use this command.");
-    // }
+    if (!hasAnyRole(interaction.member, process.env.ROLE_ETAT_MAJOR)) {
+      return interaction.editReply({ content: "❌ You do not have permission to use this command." });
+    }
 
     const targetUser   = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
