@@ -23,9 +23,9 @@ module.exports = {
 
   async execute(interaction) {
     const DEPT_ROLES = {
-      "Recruitment Department": process.env.ROLE_DEPT_RECRUITMENT,
-      "Propaganda Department":  process.env.ROLE_DEPT_PROPAGANDA,
-      "Flag Department":        process.env.ROLE_DEPT_FLAG,
+      "Recruitment Department": "1224512938983952475",
+      "Propaganda Department":  "1224513613377568889",
+      "Flag Department":        "1193815658182492191",
     };
 
     const targetUser = interaction.options.getUser("user");
