@@ -131,6 +131,10 @@ client.on("interactionCreate", async (interaction) => {
 
   try {
     await interaction.deferReply(command.ephemeral === false ? {} : { flags: 64 });
+    if (interaction.guild && interaction.member) {
+      const freshMember = await interaction.guild.members.fetch({ user: interaction.user.id, force: true }).catch(() => null);
+      if (freshMember) interaction.member = freshMember;
+    }
     await command.execute(interaction);
   } catch (err) {
     if (err?.code === 10062 || err?.code === 40060) return; // expired or already handled by another instance
