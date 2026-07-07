@@ -1,11 +1,11 @@
 const PROTECTED_ROLE_IDS = new Set([
-  process.env.KEEP_ROLE_VERIFIED,
-  process.env.KEEP_ROLE_MERIT_GRADE,
-  process.env.KEEP_ROLE_PERMISSIONS,
-  process.env.KEEP_ROLE_DESIGNATION,
-  process.env.KEEP_ROLE_DEPARTMENTS,
-  process.env.KEEP_ROLE_AWARDS,
-].filter(Boolean));
+  "1193239194529714378", // Verified
+  "1420175239429623858", // Merit Grade
+  "1193239194571649051", // Permissions
+  "1193239194571649044", // Designation
+  "1239206838029783041", // Departments
+  "1193239194529714381", // Awards
+]);
 
 function hasAnyRole(member, ...roleIds) {
   // _roles is the raw role ID array from the gateway — never filtered through guild.roles.cache
