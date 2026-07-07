@@ -9,10 +9,6 @@ module.exports = {
 
   async execute(interaction) {
 
-    if (!hasAnyRole(interaction.member, process.env.ROLE_ETAT_MAJOR)) {
-      return interaction.editReply({ content: "❌ You do not have permission to use this command." });
-    }
-
     const affectedIds = await removeAllDemerits();
 
     for (const userId of affectedIds) {

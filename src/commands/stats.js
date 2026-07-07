@@ -10,10 +10,6 @@ module.exports = {
 
   async execute(interaction) {
 
-    if (!hasAnyRole(interaction.member, process.env.ROLE_REGIMENT)) {
-      return interaction.editReply({ content: "❌ You do not have permission to use this command." });
-    }
-
     const stats = await getStats(interaction.user.id);
 
     if (!stats) {
