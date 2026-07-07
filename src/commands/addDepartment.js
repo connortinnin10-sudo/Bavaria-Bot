@@ -22,6 +22,12 @@ module.exports = {
     ),
 
   async execute(interaction) {
+    const DEPT_ROLES = {
+      "Recruitment Department": process.env.ROLE_DEPT_RECRUITMENT,
+      "Propaganda Department":  process.env.ROLE_DEPT_PROPAGANDA,
+      "Flag Department":        process.env.ROLE_DEPT_FLAG,
+    };
+
     const targetUser = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
     const department = interaction.options.getString("department");
@@ -33,8 +39,9 @@ module.exports = {
       });
     }
 
-    const username = (record.rowData[2] ?? "").toString().trim();
-    const rank     = (record.rowData[0] ?? "").toString().trim();
+    const username     = (record.rowData[2] ?? "").toString().trim();
+    const rank         = (record.rowData[0] ?? "").toString().trim();
+    const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
     try {
       await addToDepartment({ userId: targetUser.id, department, rank, username });
@@ -50,6 +57,13 @@ module.exports = {
         });
       }
       throw err;
+    }
+
+    const roleId = DEPT_ROLES[department];
+    if (roleId && targetMember) {
+      await targetMember.roles.add(roleId).catch(err =>
+        console.error(`Failed to add department role:`, err.message)
+      );
     }
 
     return interaction.editReply({

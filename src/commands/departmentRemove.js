@@ -22,6 +22,11 @@ module.exports = {
     ),
 
   async execute(interaction) {
+    const DEPT_ROLES = {
+      "Recruitment Department": process.env.ROLE_DEPT_RECRUITMENT,
+      "Propaganda Department":  process.env.ROLE_DEPT_PROPAGANDA,
+      "Flag Department":        process.env.ROLE_DEPT_FLAG,
+    };
 
     const targetUser = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
@@ -34,13 +39,21 @@ module.exports = {
       });
     }
 
-    const name    = (record.rowData[2] ?? "").toString().trim();
-    const removed = await removeFromDepartment({ name, department });
+    const name         = (record.rowData[2] ?? "").toString().trim();
+    const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+    const removed      = await removeFromDepartment({ name, department });
 
     if (!removed) {
       return interaction.editReply({
         content: `**${name}** was not found in **${department}**.`,
       });
+    }
+
+    const roleId = DEPT_ROLES[department];
+    if (roleId && targetMember) {
+      await targetMember.roles.remove(roleId).catch(err =>
+        console.error(`Failed to remove department role:`, err.message)
+      );
     }
 
     return interaction.editReply({
