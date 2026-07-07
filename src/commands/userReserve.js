@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findUser, removeUser, removeFromAllDepartments, findReserveUser, reserveUser, parseUsername } = require("../sheets");
+const { PROTECTED_ROLE_IDS } = require("../permissions");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -51,8 +52,8 @@ module.exports = {
       throw err;
     }
 
-    // Remove regiment roles
-    const rolesToRemove = (process.env.RESERVE_ROLES_REMOVE ?? "").split(",").map(r => r.trim()).filter(Boolean);
+    // Remove regiment roles, never touching protected roles
+    const rolesToRemove = (process.env.RESERVE_ROLES_REMOVE ?? "").split(",").map(r => r.trim()).filter(id => id && !PROTECTED_ROLE_IDS.has(id));
     for (const roleId of rolesToRemove) {
       await targetMember.roles.remove(roleId).catch((err) =>
         console.error(`Failed to remove role ${roleId}:`, err.message)

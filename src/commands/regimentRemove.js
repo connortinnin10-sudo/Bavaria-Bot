@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { removeUser, findUser, parseUsername, removeFromAllDepartments, getActiveAccountability, removeAccountability } = require("../sheets");
-const { hasAnyRole } = require("../permissions");
+const { PROTECTED_ROLE_IDS } = require("../permissions");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -41,10 +41,9 @@ module.exports = {
     const accountability = await getActiveAccountability(targetUser.id);
     if (accountability) await removeAccountability(targetUser.id);
 
-    // 3b. Remove all roles except protected ones
-    const keepRoles = new Set(process.env.REMOVE_KEEP_ROLES.split(",").map((r) => r.trim()));
+    // 3b. Remove all roles except permanently protected ones
     const rolesToRemove = targetMember.roles.cache.filter(
-      (role) => role.id !== interaction.guild.id && !keepRoles.has(role.id)
+      (role) => role.id !== interaction.guild.id && !PROTECTED_ROLE_IDS.has(role.id)
     );
     for (const [id] of rolesToRemove) {
       await targetMember.roles.remove(id).catch((err) =>
