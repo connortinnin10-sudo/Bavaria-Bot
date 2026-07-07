@@ -113,7 +113,7 @@ client.on("interactionCreate", async (interaction) => {
     await interaction.deferReply(command.ephemeral === false ? {} : { flags: 64 });
     await command.execute(interaction);
   } catch (err) {
-    if (err?.code === 10062) return; // interaction expired — nothing to reply to
+    if (err?.code === 10062 || err?.code === 40060) return; // expired or already handled by another instance
     console.error(err);
     try {
       const msg = { content: `❌ Error: ${err?.message ?? String(err)}`, flags: 64 };
