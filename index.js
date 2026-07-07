@@ -91,6 +91,12 @@ client.once("ready", async () => {
   console.log("[roles] ROLE_PETIT_ETAT_MAJOR:", process.env.ROLE_PETIT_ETAT_MAJOR ?? "MISSING");
   console.log("[roles] ROLE_RECRUITMENT:", process.env.ROLE_RECRUITMENT ?? "MISSING");
   console.log("[roles] ROLE_DEPARTMENT_HEAD:", process.env.ROLE_DEPARTMENT_HEAD ?? "MISSING");
+  console.log("[ranks] RANK_ROLE_CONSCRIPT:", process.env.RANK_ROLE_CONSCRIPT ?? "MISSING");
+  console.log("[ranks] RANK_ROLE_SOLDAT:", process.env.RANK_ROLE_SOLDAT ?? "MISSING");
+  console.log("[ranks] RANK_ROLE_SOLDAT_DE_PREMIER:", process.env.RANK_ROLE_SOLDAT_DE_PREMIER ?? "MISSING");
+  console.log("[ranks] RANK_ROLE_CAPORAL:", process.env.RANK_ROLE_CAPORAL ?? "MISSING");
+  console.log("[ranks] RANK_ROLE_CAPORAL_DE_PREMIER:", process.env.RANK_ROLE_CAPORAL_DE_PREMIER ?? "MISSING");
+  console.log("[ranks] RANK_ROLE_CAPORAL_FOURRIER:", process.env.RANK_ROLE_CAPORAL_FOURRIER ?? "MISSING");
   await client.application.fetch().catch(() => {});
   runDailyCheck(client);
   scheduleMidnightCheck(client);
