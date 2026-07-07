@@ -57,7 +57,7 @@ module.exports = {
     const targetUser   = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
     const newRank      = interaction.options.getString("new_rank");
-    const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+    const targetMember = await interaction.guild.members.fetch({ user: targetUser.id, force: true }).catch(() => null);
 
     if (!targetMember) {
       return interaction.editReply({ content: "Could not find that member in this server." });
