@@ -15,6 +15,15 @@ const PROTECTED_RANKS = new Set([
   "Colonel",
 ]);
 
+const RANK_ROLE_IDS = new Set([
+  process.env.RANK_ROLE_CONSCRIPT,
+  process.env.RANK_ROLE_SOLDAT,
+  process.env.RANK_ROLE_SOLDAT_DE_PREMIER,
+  process.env.RANK_ROLE_CAPORAL,
+  process.env.RANK_ROLE_CAPORAL_DE_PREMIER,
+  process.env.RANK_ROLE_CAPORAL_FOURRIER,
+].filter(Boolean));
+
 const RANK_ROLES = {
   "Conscript":          process.env.RANK_ROLE_CONSCRIPT,
   "Soldat":             process.env.RANK_ROLE_SOLDAT,
@@ -47,9 +56,6 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    console.log(`[perm:rank_change] member roles: ${[...interaction.member.roles.cache.keys()].join(",")}`);
-    console.log(`[perm:rank_change] ROLE_PETIT_ETAT_MAJOR=${process.env.ROLE_PETIT_ETAT_MAJOR} ROLE_ETAT_MAJOR=${process.env.ROLE_ETAT_MAJOR}`);
-
     if (!hasAnyRole(interaction.member, process.env.ROLE_PETIT_ETAT_MAJOR, process.env.ROLE_ETAT_MAJOR)) {
       return interaction.editReply({ content: "❌ You do not have permission to use this command." });
     }
@@ -57,8 +63,8 @@ module.exports = {
     const targetUser   = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
     const newRank      = interaction.options.getString("new_rank");
-    const targetMember = await interaction.guild.members.fetch({ user: targetUser.id, force: true }).catch(() => null);
 
+    const targetMember = await interaction.guild.members.fetch({ user: targetUser.id, force: true }).catch(() => null);
     if (!targetMember) {
       return interaction.editReply({ content: "Could not find that member in this server." });
     }
@@ -87,19 +93,16 @@ module.exports = {
 
     await promoteUser(targetUser.id, newRank);
 
-    for (const [, roleId] of Object.entries(RANK_ROLES)) {
-      if (roleId && targetMember.roles.cache.has(roleId)) {
-        await targetMember.roles.remove(roleId).catch((err) =>
-          console.error(`Failed to remove rank role ${roleId}:`, err.message)
-        );
-      }
-    }
-    const newRoleId = RANK_ROLES[newRank];
-    if (newRoleId) {
-      await targetMember.roles.add(newRoleId).catch((err) =>
-        console.error(`Failed to add rank role ${newRoleId}:`, err.message)
-      );
-    }
+    // Build new role list in one API call: strip all rank roles, add the new one
+    const newRoleId  = RANK_ROLES[newRank];
+    const newRoleSet = [
+      ...[...targetMember.roles.cache.keys()].filter(id => !RANK_ROLE_IDS.has(id)),
+      ...(newRoleId ? [newRoleId] : []),
+    ];
+
+    await targetMember.edit({ roles: newRoleSet }).catch(err =>
+      console.error("Failed to update rank roles:", err.message)
+    );
 
     return interaction.editReply({
       content: `✅ **${username}** has been changed from **${currentRank || "Unknown"}** to **${newRank}**.`,
