@@ -86,6 +86,11 @@ function scheduleMidnightCheck(client) {
 
 client.once("ready", async () => {
   console.log(`✅ Bot online as ${client.user.tag}`);
+  console.log("[roles] VERIFIED_ROLE_ID:", process.env.VERIFIED_ROLE_ID ?? "MISSING");
+  console.log("[roles] ROLE_ETAT_MAJOR:", process.env.ROLE_ETAT_MAJOR ?? "MISSING");
+  console.log("[roles] ROLE_PETIT_ETAT_MAJOR:", process.env.ROLE_PETIT_ETAT_MAJOR ?? "MISSING");
+  console.log("[roles] ROLE_RECRUITMENT:", process.env.ROLE_RECRUITMENT ?? "MISSING");
+  console.log("[roles] ROLE_DEPARTMENT_HEAD:", process.env.ROLE_DEPARTMENT_HEAD ?? "MISSING");
   await client.application.fetch().catch(() => {});
   runDailyCheck(client);
   scheduleMidnightCheck(client);
