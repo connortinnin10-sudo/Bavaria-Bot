@@ -94,9 +94,10 @@ module.exports = {
     await promoteUser(targetUser.id, newRank);
 
     // Build new role list in one API call: strip all rank roles, add the new one
-    const newRoleId  = RANK_ROLES[newRank];
-    const newRoleSet = [
-      ...[...targetMember.roles.cache.keys()].filter(id => !RANK_ROLE_IDS.has(id)),
+    const newRoleId      = RANK_ROLES[newRank];
+    const currentRoleIds = targetMember._roles ?? [...targetMember.roles.cache.keys()];
+    const newRoleSet     = [
+      ...currentRoleIds.filter(id => !RANK_ROLE_IDS.has(id)),
       ...(newRoleId ? [newRoleId] : []),
     ];
 

@@ -133,7 +133,7 @@ client.on("interactionCreate", async (interaction) => {
     await interaction.deferReply(command.ephemeral === false ? {} : { flags: 64 });
     if (interaction.guild && interaction.member) {
       const freshMember = await interaction.guild.members.fetch({ user: interaction.user.id, force: true }).catch(() => null);
-      if (freshMember) interaction.member = freshMember;
+      if (freshMember?._roles) interaction.member._roles = freshMember._roles;
     }
     await command.execute(interaction);
   } catch (err) {
