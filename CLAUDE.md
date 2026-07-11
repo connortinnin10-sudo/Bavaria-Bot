@@ -36,9 +36,9 @@ Hardcoded in `src/permissions.js`:
 ## Current commands (as of last session)
 | Command | Description |
 |---|---|
-| `/user_enlist` | Enlist a fresh recruit — being redesigned (see below) |
+| `/user_enlist` | Enlist a recruit — rank auto-determined from reserve status (see below) |
 | `/user_remove` | Remove from regiment, strip roles, restore guest role |
-| `/user_reserve` | Move to reserve — being redesigned (see below) |
+| `/user_reserve` | Move to veteran/mercenary reserve, DMs the user (see below) |
 | `/user_rank_change` | Swap rank role on sheet and Discord |
 | `/user_loa` | Place member on LOA |
 | `/user_loa_remove` | Remove member from LOA |
@@ -52,39 +52,38 @@ Hardcoded in `src/permissions.js`:
 | `/recruit_clear_sheet` | Clear all tallies |
 | `/my_stats` | View own regiment stats |
 
-## Reserve system redesign (IN PROGRESS — not built yet)
-This is the main thing being designed. The reserve sheet has two separate column blocks:
+## Reserve system (rebuilt — matches live sheet)
+The reserve sheet has two separate column blocks, both normalized in code to `[discordId, name, rank]` via `RESERVE_BLOCKS` in `src/sheets.js`:
 
 ### Veteran Reserve (retired regiment members) — columns F, G, H, rows 15–234
 - F: Discord ID
-- G: Sheet username
-- H: Rank (carried over from regiment sheet at time of reserve)
+- G: Name
+- H: Former Rank (carried over from the company sheet at time of reserve, locked)
 
 ### Reserve Mercenary (never been in regiment) — columns Z, AA, AB, rows 15–234
 - Z: Discord ID
-- AA: Nickname
+- AA: Name
 - AB: Rank (always hardcoded "Soldat")
 
-### `/user_reserve` new logic
-1. Check every company sheet to confirm user is not in the regiment
-2. **If in regiment** → veteran reserve path: pull rank + username from sheet, remove from all company/department sheets, write to F/G/H columns. Rank locked at retired rank.
-3. **If not in regiment** → mercenary path: write to Z/AA/AB columns, rank hardcoded Soldat. Rank permanently locked.
+Both blocks are followed by read-only stat/attendance columns (kills, activity %, weekly checkboxes) that reserve code must never touch.
 
-### `/user_enlist` new logic (replaces current command)
-- No rank picker — bot determines rank automatically
-- Bot checks reserve sheet first:
-  - **Veteran reserve** (has data in F/G/H) → restores their saved rank + company automatically
-  - **Mercenary reserve** (has data in Z/AA/AB) → enlists as Soldat, officer picks company (timezone already stored or provided)
-  - **Not on reserve** → fresh recruit, officer picks company + provides timezone, enlists as Soldat
-- Timezone and company become optional params; bot errors if fresh recruit omits them
+### `/user_reserve` (no `timezone` option — dropped, reserve blocks have no timezone slot)
+1. Block if the target is already on either reserve block.
+2. If currently enlisted (found via `findUser`) → **veteran** path: capture their current rank + username, remove from company/department sheets, write to F/G/H with that rank locked.
+3. If not currently enlisted → **mercenary** path: write to Z/AA/AB with rank hardcoded `"Soldat"`.
+4. DMs the target: `"You were moved to reserves by @{officer}."` (`.catch(() => null)` — never blocks the command if DMs are closed). **TODO (future):** expand this DM once more detail is available — kept intentionally minimal for now.
+5. **TODO (future work, required — not abandoned):** role add/remove per reserve type is still unbuilt. `RESERVE_ROLES_REMOVE`/`RESERVE_ROLES_ADD` env vars don't exist anywhere, so that block in `userReserve.js` is currently a no-op.
+
+### `/user_enlist` (no `rank` option — rank is bot-determined)
+- `company` and `timezone` stay required, officer-supplied, **never auto-restored** — even for veterans, the officer picks company fresh each time.
+- Rank resolution via `findReserveUser`:
+  - **Veteran reserve found** → restores their locked rank, clears the reserve record.
+  - **Mercenary reserve found** → enlists as `"Soldat"`, clears the reserve record.
+  - **No reserve record at all** → true fresh recruit → enlists as `"Conscript"` (lowest tier, below Soldat).
+- No DM on enlist in this build — planned for later, explicitly deferred.
 
 ### Rank locking
-`/user_rank_change` must block if target user is found in either reserve section.
-
-### Still to confirm before building
-- What roles `/user_reserve` adds/removes for each reserve type
-- Whether veteran reenlisting restores their old company or officer picks
-- Whether mercenary reenlisting always uses officer-picked company
+`/user_rank_change` blocks with a clear message if the target is found on either reserve block (checked before the existing `PROTECTED_RANKS` officer-rank check).
 
 ## Discord role IDs (from .env)
 ```

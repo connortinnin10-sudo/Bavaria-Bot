@@ -28,7 +28,12 @@ const DEPT_GID        = parseInt(process.env.DEPT_GID, 10);
 const RESERVE_GID     = 226567638;
 const RESERVE_START   = 15;
 const RESERVE_END     = 234;
-const RESERVE_COL     = { DISCORD: 0, TIMEZONE: 1, NAME: 2 };
+
+// Both blocks normalize to [discordId, name, rank]
+const RESERVE_BLOCKS = {
+  veteran:   { colStart: "F", colEnd: "H" },  // F=Discord ID, G=Name, H=Former Rank
+  mercenary: { colStart: "Z", colEnd: "AB" }, // Z=Discord ID, AA=Name, AB=Rank
+};
 
 // Department config: rows, columns, capacity
 const DEPARTMENTS = {
@@ -679,31 +684,60 @@ async function clearRecruitSheet() {
   });
 }
 
-async function fetchReserveRows() {
+async function getReserveTabName() {
   const tabNames = await getTabNames();
   const info     = tabNames[RESERVE_GID];
   if (!info) throw new Error("Reserve sheet tab not found");
+  return info.name;
+}
+
+async function fetchReserveBlockRows(tabName, block) {
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: `${info.name}!F${RESERVE_START}:H${RESERVE_END}`,
+    range: `${tabName}!${block.colStart}${RESERVE_START}:${block.colEnd}${RESERVE_END}`,
   });
-  return { rows: res.data.values ?? [], tabName: info.name };
+  return res.data.values ?? [];
 }
 
+// A row is normalized to [discordId, name, rank] regardless of which block it came from
+function normalizeReserveRow(row) {
+  return [row[0] ?? "", row[1] ?? "", row[2] ?? ""];
+}
+
+// Searches both veteran and mercenary blocks in one round trip
 async function findReserveUser(userId) {
-  const { rows, tabName } = await fetchReserveRows();
-  for (let i = 0; i < rows.length; i++) {
-    if ((rows[i][RESERVE_COL.DISCORD] ?? "").toString().trim() === userId) {
-      return { tabName, rowNumber: RESERVE_START + i, rowData: rows[i] };
+  const tabName = await getReserveTabName();
+  const sheets  = getSheetsClient();
+
+  const veteranRange   = `${tabName}!${RESERVE_BLOCKS.veteran.colStart}${RESERVE_START}:${RESERVE_BLOCKS.veteran.colEnd}${RESERVE_END}`;
+  const mercenaryRange = `${tabName}!${RESERVE_BLOCKS.mercenary.colStart}${RESERVE_START}:${RESERVE_BLOCKS.mercenary.colEnd}${RESERVE_END}`;
+
+  const res = await sheets.spreadsheets.values.batchGet({
+    spreadsheetId: SHEET_ID,
+    ranges: [veteranRange, mercenaryRange],
+  });
+  const [veteranRows, mercenaryRows] = res.data.valueRanges.map((vr) => vr.values ?? []);
+
+  for (let i = 0; i < veteranRows.length; i++) {
+    if ((veteranRows[i][0] ?? "").toString().trim() === userId) {
+      return { type: "veteran", tabName, rowNumber: RESERVE_START + i, rowData: normalizeReserveRow(veteranRows[i]) };
+    }
+  }
+  for (let i = 0; i < mercenaryRows.length; i++) {
+    if ((mercenaryRows[i][0] ?? "").toString().trim() === userId) {
+      return { type: "mercenary", tabName, rowNumber: RESERVE_START + i, rowData: normalizeReserveRow(mercenaryRows[i]) };
     }
   }
   return null;
 }
 
-async function reserveUser({ userId, timezone, username }) {
-  const { rows, tabName } = await fetchReserveRows();
-  const sheets = getSheetsClient();
+async function reserveUser({ userId, username, rank, type }) {
+  const block = RESERVE_BLOCKS[type];
+  if (!block) throw new Error(`Unknown reserve type: ${type}`);
+
+  const tabName = await getReserveTabName();
+  const rows    = await fetchReserveBlockRows(tabName, block);
 
   let targetRow = null;
   const maxRows = RESERVE_END - RESERVE_START + 1;
@@ -716,21 +750,17 @@ async function reserveUser({ userId, timezone, username }) {
   }
   if (targetRow === null) throw new Error("NO_SPACE");
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SHEET_ID,
-    range: `${tabName}!F${targetRow}:H${targetRow}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[userId, timezone, username]] },
-  });
+  await writeRow(tabName, block.colStart, block.colEnd, targetRow, ["'" + userId, username, rank]);
 }
 
 async function removeReserveUser(userId) {
   const found = await findReserveUser(userId);
   if (!found) return false;
+  const block  = RESERVE_BLOCKS[found.type];
   const sheets = getSheetsClient();
   await sheets.spreadsheets.values.clear({
     spreadsheetId: SHEET_ID,
-    range: `${found.tabName}!F${found.rowNumber}:H${found.rowNumber}`,
+    range: `${found.tabName}!${block.colStart}${found.rowNumber}:${block.colEnd}${found.rowNumber}`,
   });
   return true;
 }

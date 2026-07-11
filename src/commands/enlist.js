@@ -20,19 +20,6 @@ module.exports = {
     )
     .addStringOption((opt) =>
       opt.setName("timezone").setDescription("Recruit's timezone (e.g. EST, GMT+1)").setRequired(true)
-    )
-    .addStringOption((opt) =>
-      opt
-        .setName("rank")
-        .setDescription("Starting rank")
-        .setRequired(true)
-        .addChoices(
-          { name: "Soldat",             value: "Soldat"             },
-          { name: "Soldat de Premier",  value: "Soldat de Premier"  },
-          { name: "Caporal",            value: "Caporal"            },
-          { name: "Caporal de Premier", value: "Caporal de Premier" },
-          { name: "Caporal-Fourrier",   value: "Caporal-Fourrier"   }
-        )
     ),
 
   async execute(interaction) {
@@ -43,7 +30,6 @@ module.exports = {
     const displayName  = parseUsername(targetMember?.nickname ?? targetUser.username);
     const company      = interaction.options.getString("company");
     const timezone     = interaction.options.getString("timezone");
-    const rank         = interaction.options.getString("rank");
 
     // Check if already enlisted
     const existing = await findUser(targetUser.id);
@@ -53,9 +39,18 @@ module.exports = {
       });
     }
 
-    // If on reserve, remove them automatically before enlisting
-    const onReserve = await findReserveUser(targetUser.id);
-    if (onReserve) await removeReserveUser(targetUser.id);
+    // Determine rank from reserve status: veteran restores their carried rank,
+    // mercenary re-enlists as Soldat, and a true fresh recruit starts as Conscript.
+    const reserveRecord = await findReserveUser(targetUser.id);
+    let rank = "Conscript";
+    if (reserveRecord) {
+      if (reserveRecord.type === "veteran") {
+        rank = (reserveRecord.rowData[2] ?? "").toString().trim() || "Soldat";
+      } else {
+        rank = "Soldat";
+      }
+      await removeReserveUser(targetUser.id);
+    }
 
     try {
       await enlistUser({
@@ -76,6 +71,7 @@ module.exports = {
 
     // Assign roles
     const RANK_ROLES = {
+      "Conscript":          process.env.RANK_ROLE_CONSCRIPT,
       "Soldat":             process.env.RANK_ROLE_SOLDAT,
       "Soldat de Premier":  process.env.RANK_ROLE_SOLDAT_DE_PREMIER,
       "Caporal":            process.env.RANK_ROLE_CAPORAL,
@@ -108,7 +104,7 @@ module.exports = {
     );
 
     return interaction.editReply({
-      content: `✅ **${displayName}** has been enlisted.\n> **Company:** ${company}\n> **Timezone:** ${timezone}\n> **Rank:** ${rank}\n> **Nickname updated to:** ${newNickname}`,
+      content: `✅ **${displayName}** has been enlisted.\n> **Company:** ${company}\n> **Timezone:** ${timezone}\n> **Rank:** ${rank}${reserveRecord ? ` (restored from ${reserveRecord.type} reserve)` : ""}\n> **Nickname updated to:** ${newNickname}`,
     });
   },
 };

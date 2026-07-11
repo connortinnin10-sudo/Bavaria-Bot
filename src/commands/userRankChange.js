@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { promoteUser, findUser } = require("../sheets");
+const { promoteUser, findUser, findReserveUser, parseUsername } = require("../sheets");
 
 const PROTECTED_RANKS = new Set([
   "Sergent",
@@ -64,6 +64,14 @@ module.exports = {
     const targetMember = await interaction.guild.members.fetch({ user: targetUser.id, force: true }).catch(() => null);
     if (!targetMember) {
       return interaction.editReply({ content: "Could not find that member in this server." });
+    }
+
+    const reserveRecord = await findReserveUser(targetUser.id);
+    if (reserveRecord) {
+      const name = parseUsername(targetMember.nickname ?? targetUser.username);
+      return interaction.editReply({
+        content: `**${name}** is on the ${reserveRecord.type} reserve roster and cannot have their rank changed. Re-enlist them with /user_enlist first.`,
+      });
     }
 
     const record = await findUser(targetUser.id);
