@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { enlistUser, findUser, parseUsername, findReserveUser, removeReserveUser } = require("../sheets");
+const { enlistUser, findUser, parseUsername, findReserveUser, removeReserveUser, getCompanyStaff } = require("../sheets");
+const { buildWelcomeEmbed } = require("../welcomeEmbed");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -102,6 +103,11 @@ module.exports = {
     await targetMember.setNickname(newNickname).catch((err) =>
       console.error("Failed to set nickname:", err.message)
     );
+
+    // DM the recruit a welcome embed with company staff tags and channel links
+    const staff = await getCompanyStaff(company);
+    const { embed, files } = buildWelcomeEmbed({ userId: targetUser.id, company, staff });
+    await targetUser.send({ embeds: [embed], files }).catch(() => null);
 
     return interaction.editReply({
       content: `✅ **${displayName}** has been enlisted.\n> **Company:** ${company}\n> **Timezone:** ${timezone}\n> **Rank:** ${rank}${reserveRecord ? ` (restored from ${reserveRecord.type} reserve)` : ""}\n> **Nickname updated to:** ${newNickname}`,

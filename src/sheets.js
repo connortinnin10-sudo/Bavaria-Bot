@@ -24,6 +24,18 @@ const COMPANY_GID = {
   Rosenheim: 1875189602,
 };
 
+// Company staff block (Kompaniestab): C=Rank, D=Name, rows 21-26.
+// Position is implied by row index, not read from a column.
+const STAFF_ROWS = [
+  { row: 21, position: "Kommandant" },
+  { row: 22, position: "Unterkommandant" },
+  { row: 23, position: "Unteroffizier" },
+  { row: 24, position: "Unteroffizier" },
+  { row: 25, position: "Unteroffizier" },
+  { row: 26, position: "Unteroffizier" },
+];
+const STAFF_RANGE = "C21:D26";
+
 const DEPT_GID        = parseInt(process.env.DEPT_GID, 10);
 const RESERVE_GID     = 226567638;
 const RESERVE_START   = 15;
@@ -211,6 +223,43 @@ async function enlistUser({ userId, username, company, timezone, rank }) {
       }],
     },
   });
+}
+
+// Reads the Kompaniestab block (rows 21-26) for a company and cross-references
+// each name against the roster to resolve a Discord ID for tagging.
+async function getCompanyStaff(company) {
+  const tabNames = await getTabNames();
+  const gid      = COMPANY_GID[company];
+  const info     = tabNames[gid];
+  if (!info) throw new Error(`No tab found for company: ${company}`);
+
+  const sheets = getSheetsClient();
+  const [staffRes, rosterRows] = await Promise.all([
+    sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${info.name}!${STAFF_RANGE}` }),
+    fetchEnlistRows(info.name, ENLIST_READ_START),
+  ]);
+  const staffRows = staffRes.data.values ?? [];
+
+  const nameToId = new Map();
+  for (const row of rosterRows) {
+    const name = (row[COL.NAME.idx] ?? "").toString().trim().toLowerCase();
+    const id   = (row[COL.DISCORD.idx] ?? "").toString().trim();
+    if (name && id) nameToId.set(name, id);
+  }
+
+  const etatMajor = [];
+  const petitEtatMajor = [];
+  STAFF_ROWS.forEach(({ row, position }, i) => {
+    const rowData = staffRows[i] ?? [];
+    const rank = (rowData[0] ?? "").toString().trim();
+    const name = (rowData[1] ?? "").toString().trim();
+    if (!name || name === "-") return;
+
+    const entry = { position, rank, name, discordId: nameToId.get(name.toLowerCase()) ?? null };
+    (row <= 22 ? etatMajor : petitEtatMajor).push(entry);
+  });
+
+  return { etatMajor, petitEtatMajor };
 }
 
 async function removeUser(userId) {
@@ -891,4 +940,4 @@ async function removeAllDemerits() {
   return affectedIds;
 }
 
-module.exports = { enlistUser, removeUser, getStats, findUser, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits };
+module.exports = { enlistUser, removeUser, getStats, findUser, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff };
