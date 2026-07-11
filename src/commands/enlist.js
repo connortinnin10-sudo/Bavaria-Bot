@@ -107,10 +107,15 @@ module.exports = {
     // DM the recruit a welcome embed with company staff tags and channel links
     const staff = await getCompanyStaff(company);
     const { embed, files } = buildWelcomeEmbed({ userId: targetUser.id, company, staff });
-    await targetUser.send({ embeds: [embed], files }).catch(() => null);
+    let dmFailed = false;
+    await targetUser.send({ embeds: [embed], files }).catch(() => { dmFailed = true; });
+
+    const dmNote = dmFailed
+      ? `\n> ⚠️ Could not send the welcome DM — **${displayName}**'s DMs appear to be closed.`
+      : "";
 
     return interaction.editReply({
-      content: `✅ **${displayName}** has been enlisted.\n> **Company:** ${company}\n> **Timezone:** ${timezone}\n> **Rank:** ${rank}${reserveRecord ? ` (restored from ${reserveRecord.type} reserve)` : ""}\n> **Nickname updated to:** ${newNickname}`,
+      content: `✅ **${displayName}** has been enlisted.\n> **Company:** ${company}\n> **Timezone:** ${timezone}\n> **Rank:** ${rank}${reserveRecord ? ` (restored from ${reserveRecord.type} reserve)` : ""}\n> **Nickname updated to:** ${newNickname}${dmNote}`,
     });
   },
 };
