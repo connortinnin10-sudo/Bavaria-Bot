@@ -18,7 +18,7 @@ function formatStaffLine({ position, discordId, name }) {
 
 function buildWelcomeEmbed({ userId, company, staff }) {
   const mention      = `<@${userId}>`;
-  const companyLabel = `FÜSILIER-KOMPANIE ${company.toUpperCase()}`;
+  const companyLabel = `**FÜSILIER-KOMPANIE ${company.toUpperCase()}**`;
 
   const description = [
     `**━**`,
