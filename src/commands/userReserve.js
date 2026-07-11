@@ -2,6 +2,12 @@ const { SlashCommandBuilder } = require("discord.js");
 const { findUser, removeUser, removeFromAllDepartments, findReserveUser, reserveUser, parseUsername } = require("../sheets");
 const { PROTECTED_ROLE_IDS } = require("../permissions");
 
+const DEPT_ROLES = {
+  "Recruitment Department": "1224512938983952475",
+  "Propaganda Department":  "1224513613377568889",
+  "Flag Department":        "1193815658182492191",
+};
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("user_reserve")
@@ -52,6 +58,13 @@ module.exports = {
         return interaction.editReply({ content: "❌ The reserve roster is full. No available slots." });
       }
       throw err;
+    }
+
+    // Strip all department roles, same as a full regiment removal would
+    for (const roleId of Object.values(DEPT_ROLES)) {
+      await targetMember.roles.remove(roleId).catch((err) =>
+        console.error(`Failed to remove department role ${roleId}:`, err.message)
+      );
     }
 
     // TODO (future work, required — not abandoned): /user_reserve needs veteran/mercenary-specific
