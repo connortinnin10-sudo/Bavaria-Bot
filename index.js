@@ -1,3 +1,4 @@
+// BavariaBot — 2nd Bavarian Regiment Discord bot
 const { setDefaultResultOrder } = require("dns");
 setDefaultResultOrder("ipv4first"); // prevent IPv6 fallback delay on Railway
 
@@ -86,11 +87,6 @@ function scheduleMidnightCheck(client) {
 
 client.once("ready", async () => {
   console.log(`✅ Bot online as ${client.user.tag}`);
-  console.log("[roles] VERIFIED_ROLE_ID:", process.env.VERIFIED_ROLE_ID ?? "MISSING");
-  console.log("[roles] ROLE_ETAT_MAJOR:", process.env.ROLE_ETAT_MAJOR ?? "MISSING");
-  console.log("[roles] ROLE_PETIT_ETAT_MAJOR:", process.env.ROLE_PETIT_ETAT_MAJOR ?? "MISSING");
-  console.log("[roles] ROLE_RECRUITMENT:", process.env.ROLE_RECRUITMENT ?? "MISSING");
-  console.log("[roles] ROLE_DEPARTMENT_HEAD:", process.env.ROLE_DEPARTMENT_HEAD ?? "MISSING");
   console.log("[ranks] RANK_ROLE_CONSCRIPT:", process.env.RANK_ROLE_CONSCRIPT ?? "MISSING");
   console.log("[ranks] RANK_ROLE_SOLDAT:", process.env.RANK_ROLE_SOLDAT ?? "MISSING");
   console.log("[ranks] RANK_ROLE_SOLDAT_DE_PREMIER:", process.env.RANK_ROLE_SOLDAT_DE_PREMIER ?? "MISSING");

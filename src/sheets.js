@@ -167,13 +167,6 @@ async function findUser(userId) {
   return null;
 }
 
-// Look up a user's rank from the enlist sheet by Discord ID
-async function getUserRank(userId) {
-  const found = await findUser(userId);
-  if (!found) return null;
-  return (found.rowData[COL.RANK.idx] ?? "").toString().trim() || null;
-}
-
 async function enlistUser({ userId, username, company, timezone, rank }) {
   const tabNames = await getTabNames();
   const gid      = COMPANY_GID[company];
@@ -461,18 +454,6 @@ async function getActiveAccountability(userId) {
   return null;
 }
 
-async function isOnAccountability(userId) {
-  const record = await findUser(userId);
-  if (!record) return false;
-  const sheets = getSheetsClient();
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: SHEET_ID,
-    range: `${record.tabName}!J${record.rowNumber}`,
-  });
-  const val = (res.data.values?.[0]?.[0] ?? "").toString().toUpperCase();
-  return val === "TRUE";
-}
-
 async function applyAccountability({ userId, leaveDate, returnDate, reason, officerId }) {
   const record = await findUser(userId);
   if (!record) return null;
@@ -612,57 +593,6 @@ async function clearExpiredAccountabilities() {
   }
 
   return { activated, deactivated };
-}
-
-async function updateUserField({ record, field, newValue, oldUsername }) {
-  const sheets  = getSheetsClient();
-  const tabNames = await getTabNames();
-
-  if (field === "timezone") {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SHEET_ID,
-      range: `${record.tabName}!H${record.rowNumber}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[newValue]] },
-    });
-  } else if (field === "username") {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SHEET_ID,
-      range: `${record.tabName}!I${record.rowNumber}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[newValue]] },
-    });
-    if (oldUsername) {
-      const deptTab = tabNames[DEPT_GID];
-      if (deptTab) {
-        for (const [, dept] of Object.entries(DEPARTMENTS)) {
-          const res = await sheets.spreadsheets.values.get({
-            spreadsheetId: SHEET_ID,
-            range: `${deptTab.name}!${dept.fetchRange(dept.startRow, dept.endRow)}`,
-          });
-          const rows = res.data.values ?? [];
-          for (let i = 0; i < rows.length; i++) {
-            const rowName = (rows[i][dept.nameIdx] ?? "").toString().trim().toLowerCase();
-            if (rowName === oldUsername.toLowerCase()) {
-              await sheets.spreadsheets.values.update({
-                spreadsheetId: SHEET_ID,
-                range: `${deptTab.name}!${dept.nameCol}${dept.startRow + i}`,
-                valueInputOption: "USER_ENTERED",
-                requestBody: { values: [[newValue]] },
-              });
-            }
-          }
-        }
-      }
-    }
-  } else if (field === "discordId") {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SHEET_ID,
-      range: `${record.tabName}!K${record.rowNumber}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[newValue]] },
-    });
-  }
 }
 
 async function incrementRecruitCount(username) {
@@ -931,4 +861,4 @@ async function removeAllDemerits() {
   return affectedIds;
 }
 
-module.exports = { enlistUser, removeUser, getStats, findUser, getUserRank, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, updateUserField, getActiveAccountability, isOnAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits };
+module.exports = { enlistUser, removeUser, getStats, findUser, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits };

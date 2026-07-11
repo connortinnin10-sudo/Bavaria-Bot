@@ -1,6 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { removeAccountability, findUser } = require("../sheets");
-const { hasAnyRole } = require("../permissions");
 
 module.exports = {
   data: new SlashCommandBuilder()

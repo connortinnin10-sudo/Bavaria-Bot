@@ -1,6 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findUser, getActiveAccountability, applyAccountability } = require("../sheets");
-const { hasAnyRole } = require("../permissions");
 
 const DATE_REGEX = /^\d{1,2}\/\d{1,2}\/\d{2}$/;
 

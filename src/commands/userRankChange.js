@@ -1,6 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { promoteUser, findUser } = require("../sheets");
-const { hasAnyRole } = require("../permissions");
 
 const PROTECTED_RANKS = new Set([
   "Sergent",
