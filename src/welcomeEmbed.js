@@ -17,14 +17,15 @@ function formatStaffLine({ position, discordId, name }) {
 }
 
 function buildWelcomeEmbed({ userId, company, staff }) {
-  const mention = `<@${userId}>`;
+  const mention      = `<@${userId}>`;
+  const companyLabel = `FÜSILIER-KOMPANIE ${company.toUpperCase()}`;
 
   const description = [
     `**━**`,
     ``,
     `🥁 **REGIMENT ORDERS!**`,
     `Conscript ${mention},`,
-    `You are assigned to ${company}, you will conduct yourself in accordance with regimental regulations and the orders of your superiors.`,
+    `You are assigned to ${companyLabel}, you will conduct yourself in accordance with regimental regulations and the orders of your superiors.`,
     ``,
     `As part of Bavaria's contingent within the Grande Armée, you march in service to His Imperial Majesty, Emperor Napoleon I. The reputation of the regiment rests upon the discipline and conduct of every soldier.`,
     ``,
@@ -44,7 +45,7 @@ function buildWelcomeEmbed({ userId, company, staff }) {
     ``,
     `📯 **KOMPANIE ASSIGNMENT**`,
     ``,
-    `You have been assigned to ${company}, where you shall drill, campaign, and fight alongside your fellow Bavarians. Your officers have been entrusted with your instruction and welfare. Should you **require guidance**, report to your company staff.`,
+    `You have been assigned to ${companyLabel}, where you shall drill, campaign, and fight alongside your fellow Bavarians. Your officers have been entrusted with your instruction and welfare. Should you **require guidance**, report to your company staff.`,
     ``,
     `🌿 *Etat Major*`,
     ...staff.etatMajor.map(formatStaffLine),
