@@ -34,6 +34,7 @@ const COL = {
 const COMPANY_GID = {
   Bayreuth:  261215654,
   Rosenheim: 1875189602,
+  Grenadier: 161563671,
 };
 
 // Company staff block (Kompaniestab): C=Rank, D=Name, rows 21-26.
