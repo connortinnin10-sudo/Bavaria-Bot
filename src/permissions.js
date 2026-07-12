@@ -20,4 +20,11 @@ const PROTECTED_RANKS = new Set([
   "Colonel",
 ]);
 
-module.exports = { PROTECTED_ROLE_IDS, PROTECTED_RANKS };
+// Hardcoded (not read from process.env) — Railway has silently dropped env vars
+// before, which is why DEPT_ROLES and PROTECTED_ROLE_IDS were already moved here.
+const COMPANY_ROLES = {
+  Bayreuth:  "1193814561401344010",
+  Rosenheim: "1506735371353063555",
+};
+
+module.exports = { PROTECTED_ROLE_IDS, PROTECTED_RANKS, COMPANY_ROLES };

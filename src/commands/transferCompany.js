@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { transferCompany, getCompanyStaff } = require("../sheets");
 const { buildTransferEmbed } = require("../welcomeEmbed");
+const { COMPANY_ROLES } = require("../permissions");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -38,8 +39,8 @@ module.exports = {
 
     const { fromCompany, toCompany, username, rank } = result;
 
-    const OLD_ROLE = fromCompany === "Bayreuth" ? process.env.ROLE_BAYREUTH : process.env.ROLE_ROSENHEIM;
-    const NEW_ROLE = toCompany === "Bayreuth" ? process.env.ROLE_BAYREUTH : process.env.ROLE_ROSENHEIM;
+    const OLD_ROLE = COMPANY_ROLES[fromCompany];
+    const NEW_ROLE = COMPANY_ROLES[toCompany];
 
     await targetMember.roles.remove(OLD_ROLE).catch((err) =>
       console.error("Failed to remove old company role:", err.message)

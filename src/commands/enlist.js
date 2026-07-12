@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { enlistUser, findUser, parseUsername, findReserveUser, removeReserveUser, getCompanyStaff } = require("../sheets");
 const { buildWelcomeEmbed, buildVeteranWelcomeBackEmbed } = require("../welcomeEmbed");
+const { COMPANY_ROLES } = require("../permissions");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -84,7 +85,7 @@ module.exports = {
       process.env.ROLE_REGIMENT,
       process.env.ROLE_PREMIER_CORPS,
       process.env.ROLE_GRANDE_ARMEE,
-      company === "Bayreuth" ? process.env.ROLE_BAYREUTH : process.env.ROLE_ROSENHEIM,
+      COMPANY_ROLES[company],
       RANK_ROLES[rank],
     ].filter(Boolean);
 
