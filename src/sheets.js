@@ -204,9 +204,13 @@ async function enlistUser({ userId, username, company, timezone, rank }) {
 
   const rows = await fetchEnlistRows(info.name, ENLIST_START_ROW);
 
+  // Loop over the full declared range, not rows.length — the Sheets API omits
+  // trailing rows entirely when they're fully blank, so if the only open slot
+  // is at the tail end, rows.length comes back short and a rows.length-bounded
+  // loop would never reach it, wrongly reporting NO_SPACE.
   let targetRowNumber = null;
-  for (let i = 0; i < rows.length; i++) {
-    if (isEnlistRowAvailable(rows[i])) {
+  for (let i = 0; i < (ENLIST_END_ROW - ENLIST_START_ROW + 1); i++) {
+    if (isEnlistRowAvailable(rows[i] ?? [])) {
       targetRowNumber = ENLIST_START_ROW + i;
       break;
     }
@@ -271,11 +275,14 @@ async function transferCompany(userId) {
   const paddedCore       = Array.from({ length: ROSTER_CORE_WIDTH },       (_, i) => coreRow[i] ?? "");
   const paddedAttendance = Array.from({ length: ROSTER_ATTENDANCE_WIDTH }, (_, i) => attendanceRow[i] ?? "");
 
-  // Find the first open row on the target company (same rule as enlistUser)
+  // Find the first open row on the target company (same rule as enlistUser).
+  // Loop over the full declared range, not targetRows.length — see the same
+  // comment in enlistUser for why a rows.length-bounded loop misses a trailing
+  // open slot when the Sheets API drops fully-blank trailing rows.
   const targetRows = await fetchEnlistRows(targetInfo.name, ENLIST_START_ROW);
   let targetRowNumber = null;
-  for (let i = 0; i < targetRows.length; i++) {
-    if (isEnlistRowAvailable(targetRows[i])) {
+  for (let i = 0; i < (ENLIST_END_ROW - ENLIST_START_ROW + 1); i++) {
+    if (isEnlistRowAvailable(targetRows[i] ?? [])) {
       targetRowNumber = ENLIST_START_ROW + i;
       break;
     }
