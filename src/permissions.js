@@ -7,4 +7,17 @@ const PROTECTED_ROLE_IDS = new Set([
   "1193239194529714381", // Awards
 ]);
 
-module.exports = { PROTECTED_ROLE_IDS };
+const PROTECTED_RANKS = new Set([
+  "Sergent",
+  "Sergent Major",
+  "Adjutant",
+  "Adjutant Sous-Officier",
+  "Sous-Lieutenant",
+  "Lieutenant",
+  "Capitaine",
+  "Chef De Bataillon",
+  "Major",
+  "Colonel",
+]);
+
+module.exports = { PROTECTED_ROLE_IDS, PROTECTED_RANKS };

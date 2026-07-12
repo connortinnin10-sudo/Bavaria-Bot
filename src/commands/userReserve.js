@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findUser, removeUser, removeFromAllDepartments, findReserveUser, reserveUser, parseUsername } = require("../sheets");
-const { PROTECTED_ROLE_IDS } = require("../permissions");
+const { PROTECTED_ROLE_IDS, PROTECTED_RANKS } = require("../permissions");
 
 const DEPT_ROLES = {
   "Recruitment Department": "1224512938983952475",
@@ -42,6 +42,7 @@ module.exports = {
     if (enlistRecord) {
       type = "veteran";
       rank = (enlistRecord.rowData[0] ?? "").toString().trim() || "Soldat";
+      if (PROTECTED_RANKS.has(rank)) rank = "Caporal-Fourrier";
       const storedUsername = (enlistRecord.rowData[2] ?? "").toString().trim();
       await removeUser(targetUser.id);
       if (storedUsername) await removeFromAllDepartments(storedUsername);

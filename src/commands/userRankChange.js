@@ -1,18 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { promoteUser, findUser, findReserveUser, parseUsername } = require("../sheets");
-
-const PROTECTED_RANKS = new Set([
-  "Sergent",
-  "Sergent Major",
-  "Adjutant",
-  "Adjutant Sous-Officier",
-  "Sous-Lieutenant",
-  "Lieutenant",
-  "Capitaine",
-  "Chef De Bataillon",
-  "Major",
-  "Colonel",
-]);
+const { PROTECTED_RANKS } = require("../permissions");
 
 const RANK_ROLE_IDS = new Set([
   process.env.RANK_ROLE_CONSCRIPT,
