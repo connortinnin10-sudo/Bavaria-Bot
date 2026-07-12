@@ -13,11 +13,13 @@ const CHANNEL_IDS = {
   announcements:     "1226982191083556904",
 };
 
+// Comma style, used by buildWelcomeEmbed.
 function formatStaffLine({ position, discordId, name }) {
   const tag = discordId ? `<@${discordId}>` : name;
   return `*${position}*, ${tag}`;
 }
 
+// Em-dash style, used by buildVeteranWelcomeBackEmbed.
 function formatStaffLineDash({ position, discordId, name }) {
   const tag = discordId ? `<@${discordId}>` : name;
   return `*${position}* — ${tag}`;
@@ -35,6 +37,8 @@ function buildEmbed(title, description) {
   return { embed, files };
 }
 
+// /user_enlist — fresh recruits (Conscript) and re-enlisting mercenaries (Soldat).
+// NOT sent to returning veterans; see buildVeteranWelcomeBackEmbed below.
 function buildWelcomeEmbed({ userId, company, rank, staff }) {
   const mention      = `<@${userId}>`;
   const companyLabel = `**FÜSILIER-KOMPANIE ${company.toUpperCase()}**`;
@@ -93,6 +97,7 @@ function buildWelcomeEmbed({ userId, company, rank, staff }) {
   return buildEmbed(`Welcome to the 2. Linien-Infanterie-Regiment "Kronprinz"`, description);
 }
 
+// /user_enlist — only when the recruit is coming off the veteran reserve block.
 function buildVeteranWelcomeBackEmbed({ userId, rank, company, staff }) {
   const mention = `<@${userId}>`;
 
@@ -133,6 +138,7 @@ function buildVeteranWelcomeBackEmbed({ userId, rank, company, staff }) {
   return buildEmbed(`Welcome Back to the 2. Linien-Infanterie-Regiment "Kronprinz"`, description);
 }
 
+// /user_reserve — veteran path (member was currently enlisted when moved to reserve).
 function buildVeteranReserveEmbed({ userId }) {
   const mention = `<@${userId}>`;
 
@@ -165,6 +171,7 @@ function buildVeteranReserveEmbed({ userId }) {
   return buildEmbed("Welcome to the Bavarian Veteran Kompanie", description);
 }
 
+// /user_reserve — mercenary path (member was not currently enlisted when moved to reserve).
 function buildMercenaryReserveEmbed({ userId }) {
   const mention = `<@${userId}>`;
 
