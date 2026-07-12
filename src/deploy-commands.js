@@ -19,6 +19,7 @@ const commands = [
   require("./commands/demeritAdd").data.toJSON(),
   require("./commands/demeritRemove").data.toJSON(),
   require("./commands/demeritRemoveAll").data.toJSON(),
+  require("./commands/honoursSync").data.toJSON(),
 ];
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);

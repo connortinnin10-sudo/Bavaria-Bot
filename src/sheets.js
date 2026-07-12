@@ -85,12 +85,15 @@ let tabNameCache = null;
 let _auth        = null;
 
 // Railway sometimes strips newlines from env vars, leaving the PEM as one long line.
-// This re-wraps the base64 body at 64 chars so OpenSSL can parse it.
+// This re-wraps the base64 body at 64 chars so OpenSSL can parse it. Also strips stray
+// backslashes, not just whitespace — a double-escaped key (\\n instead of \n) leaves a
+// literal backslash embedded in the body after one round of \n-unescaping, which
+// corrupts the base64 and fails with "DECODER routines::unsupported" otherwise.
 function normalizePrivateKey(raw) {
   const pem = (raw || "").replace(/\\n/g, "\n");
   const m   = pem.match(/(-+BEGIN PRIVATE KEY-+)([\s\S]*?)(-+END PRIVATE KEY-+)/);
   if (!m) return pem;
-  const body = m[2].replace(/\s+/g, "").match(/.{1,64}/g)?.join("\n") ?? "";
+  const body = m[2].replace(/[\s\\]+/g, "").match(/.{1,64}/g)?.join("\n") ?? "";
   return `${m[1]}\n${body}\n${m[3]}\n`;
 }
 
@@ -1104,4 +1107,4 @@ async function clearExile(userId) {
   return true;
 }
 
-module.exports = { enlistUser, removeUser, getStats, findUser, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany };
+module.exports = { enlistUser, removeUser, getStats, findUser, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, getSheetsClient };

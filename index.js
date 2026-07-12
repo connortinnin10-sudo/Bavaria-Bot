@@ -34,6 +34,7 @@ const commands = [
   require("./src/commands/demeritAdd"),
   require("./src/commands/demeritRemove"),
   require("./src/commands/demeritRemoveAll"),
+  require("./src/commands/honoursSync"),
 ];
 
 // /user_clear_exile must stay able to target exiled users; every other

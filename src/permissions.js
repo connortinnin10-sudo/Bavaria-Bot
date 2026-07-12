@@ -66,6 +66,7 @@ const COMMAND_PERMISSIONS = {
   department_remove:   [],
 
   my_stats:            [ROLE_REGIMENT],
+  honours_sync:        [ROLE_REGIMENT],
 };
 
 module.exports = {
