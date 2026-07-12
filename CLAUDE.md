@@ -126,6 +126,9 @@ DEPT_GID=1958342844
 DISCORD_GUILD_ID=1193239194395476008
 ```
 
+## Command logging
+Every slash command invocation is logged to a Discord webhook, styled like the DM embeds (crest thumbnail, `BAVARIAN_BLUE` accent). `src/commandLog.js` exports `logCommand({ commandName, officerId, targetUser, reason })`, called centrally from `index.js` right after `await command.execute(interaction)` succeeds — no per-command changes needed for new commands to get logged automatically. Only commands that actually ran are logged (permission-denied / exile-blocked short-circuits never reach this point). Sends via `WebhookClient` using the `LOG_WEBHOOK_URL` env var; if that var is unset, `logCommand` no-ops with a console warning rather than throwing — **remember to set `LOG_WEBHOOK_URL` in the Railway dashboard**, not just `.env`, or logging silently does nothing in production (the same Railway env var pitfall noted above).
+
 ## Technical notes
 - `interaction.member._roles` — raw role ID array from gateway, use this instead of `member.roles.cache` to avoid stale cache issues
 - `interaction.member = freshMember` silently fails (non-writable). Patch via `interaction.member._roles = freshMember._roles`

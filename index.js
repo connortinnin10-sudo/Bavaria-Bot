@@ -10,6 +10,7 @@ const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const { clearExpiredAccountabilities, isExiled } = require("./src/sheets");
 const { hasAnyRole, ROLE_ETAT_MAJOR, COMMAND_PERMISSIONS } = require("./src/permissions");
 const { buildLoaActiveEmbed, buildLoaEndedEmbed } = require("./src/notifyEmbeds");
+const { logCommand } = require("./src/commandLog");
 require("dotenv").config();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.DirectMessages] });
@@ -142,8 +143,9 @@ client.on("interactionCreate", async (interaction) => {
       if (freshMember?._roles) interaction.member._roles = freshMember._roles;
     }
 
+    const targetUser = interaction.options.getUser("user");
+
     if (!EXILE_CHECK_EXEMPT.has(interaction.commandName)) {
-      const targetUser = interaction.options.getUser("user");
       if (targetUser && await isExiled(targetUser.id)) {
         return interaction.editReply({
           content: `⛔ **${targetUser.username}** is exiled and cannot be enlisted or have commands run on them. Use \`/user_clear_exile\` first.`,
@@ -164,6 +166,13 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     await command.execute(interaction);
+
+    await logCommand({
+      commandName: interaction.commandName,
+      officerId: interaction.user.id,
+      targetUser,
+      reason: interaction.options.getString("reason"),
+    });
   } catch (err) {
     if (err?.code === 10062 || err?.code === 40060) return; // expired or already handled by another instance
     console.error(err);
