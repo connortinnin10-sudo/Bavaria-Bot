@@ -8,6 +8,12 @@ const ENLIST_READ_START  = 15; // read from row 15 (includes all command/officer
 const ENLIST_START_ROW   = 23; // write only from row 23
 const ENLIST_END_ROW     = 68;
 
+// Full per-member roster row: G=Rank ... N=Activity%, then O:AB are the cycle's
+// 14 weekly attendance checkboxes. AC onward is the (computed, not per-row) leaderboard.
+const ROSTER_ROW_START_COL = "G";
+const ROSTER_ROW_END_COL   = "AB";
+const ROSTER_ROW_WIDTH     = 22;
+
 const COL = {
   RANK:     { letter: "G", idx: 0 },
   TIMEZONE: { letter: "H", idx: 1 },
@@ -223,6 +229,76 @@ async function enlistUser({ userId, username, company, timezone, rank }) {
       }],
     },
   });
+}
+
+// Moves an enlisted member's full roster row (rank, timezone, name, Discord ID,
+// kills, KPE, activity%, and all weekly attendance checkboxes) to the first open
+// row on the other company's sheet, then clears the old row entirely.
+async function transferCompany(userId) {
+  const found = await findUser(userId);
+  if (!found) return null;
+
+  const targetCompany = found.company === "Bayreuth" ? "Rosenheim" : "Bayreuth";
+  const tabNames  = await getTabNames();
+  const targetInfo = tabNames[COMPANY_GID[targetCompany]];
+  if (!targetInfo) throw new Error(`No tab found for company: ${targetCompany}`);
+
+  const sheets = getSheetsClient();
+
+  // Read the full per-member row from the source tab
+  const sourceRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${found.tabName}!${ROSTER_ROW_START_COL}${found.rowNumber}:${ROSTER_ROW_END_COL}${found.rowNumber}`,
+  });
+  const sourceRow = sourceRes.data.values?.[0] ?? [];
+  // Pad to full width so trailing blank cells overwrite any stale data already
+  // sitting in the destination row (removeUser only clears G:K, not the rest).
+  const fullRowData = Array.from({ length: ROSTER_ROW_WIDTH }, (_, i) => sourceRow[i] ?? "");
+
+  // Find the first open row on the target company (same rule as enlistUser)
+  const targetRows = await fetchEnlistRows(targetInfo.name, ENLIST_START_ROW);
+  let targetRowNumber = null;
+  for (let i = 0; i < targetRows.length; i++) {
+    if (isEnlistRowAvailable(targetRows[i])) {
+      targetRowNumber = ENLIST_START_ROW + i;
+      break;
+    }
+  }
+  if (targetRowNumber === null) throw new Error("NO_SPACE");
+
+  await writeRow(targetInfo.name, ROSTER_ROW_START_COL, ROSTER_ROW_END_COL, targetRowNumber, fullRowData);
+
+  // Re-apply checkbox validation on column J (LOA), same as enlistUser
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: {
+      requests: [{
+        setDataValidation: {
+          range: {
+            sheetId:          targetInfo.sheetId,
+            startRowIndex:    targetRowNumber - 1,
+            endRowIndex:      targetRowNumber,
+            startColumnIndex: 9, // column J
+            endColumnIndex:   10,
+          },
+          rule: { condition: { type: "BOOLEAN" }, strict: true },
+        },
+      }],
+    },
+  });
+
+  // Clear the entire old row on the source company
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: SHEET_ID,
+    range: `${found.tabName}!${ROSTER_ROW_START_COL}${found.rowNumber}:${ROSTER_ROW_END_COL}${found.rowNumber}`,
+  });
+
+  return {
+    fromCompany: found.company,
+    toCompany:   targetCompany,
+    rank:        (fullRowData[COL.RANK.idx] ?? "").toString().trim(),
+    username:    (fullRowData[COL.NAME.idx] ?? "").toString().trim(),
+  };
 }
 
 // Reads the Kompaniestab block (rows 21-26) for a company and cross-references
@@ -987,4 +1063,4 @@ async function clearExile(userId) {
   return true;
 }
 
-module.exports = { enlistUser, removeUser, getStats, findUser, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile };
+module.exports = { enlistUser, removeUser, getStats, findUser, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany };

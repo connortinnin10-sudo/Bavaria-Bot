@@ -24,6 +24,7 @@ const commands = [
   require("./src/commands/departmentRemove"),
   require("./src/commands/userRankChange"),
   require("./src/commands/userReserve"),
+  require("./src/commands/transferCompany"),
   require("./src/commands/recruitAdd"),
   require("./src/commands/recruitRemove"),
   require("./src/commands/recruitClearSheet"),

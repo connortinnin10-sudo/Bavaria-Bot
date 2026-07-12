@@ -40,6 +40,7 @@ Hardcoded in `src/permissions.js`:
 | `/user_exile` | Permanently ban: remove from all sheets (incl. reserves), blacklist them (see below) |
 | `/user_clear_exile` | Clear an exile so the member can be enlisted/targeted again |
 | `/user_reserve` | Move to veteran/mercenary reserve, DMs the user (see below) |
+| `/transfer_company` | Move an enlisted member's full roster row to the other company (see below) |
 | `/user_rank_change` | Swap rank role on sheet and Discord |
 | `/user_loa` | Place member on LOA |
 | `/user_loa_remove` | Remove member from LOA |
@@ -85,6 +86,9 @@ Both blocks are followed by read-only stat/attendance columns (kills, activity %
 
 ### Rank locking
 `/user_rank_change` blocks with a clear message if the target is found on either reserve block (checked before the existing `PROTECTED_RANKS` officer-rank check).
+
+## Company transfer
+`/transfer_company` moves a currently-enlisted member's entire per-member roster row — not just rank/timezone/name/Discord ID, but kills, KPE, activity%, and all ~14 weekly attendance checkboxes — from their current company sheet to the first open row on the other one (`transferCompany()` in `sheets.js`). The per-member row spans `G:AB` (`ROSTER_ROW_START_COL`/`ROSTER_ROW_END_COL`/`ROSTER_ROW_WIDTH` constants); columns beyond that (`AD` onward) are a computed kill/KPE leaderboard, not per-row data, and are never touched. The source row is read padded to full width before writing so it fully overwrites (rather than leaves stale) whatever was in the destination row — `removeUser`/`clearRow` only ever clears `G:K`, so old kills/attendance data can otherwise linger in a nominally "available" row. The old row is cleared in full (`G:AB`) after the copy. The command also swaps `ROLE_BAYREUTH`/`ROLE_ROSENHEIM` on Discord to match. No DM is sent on transfer (not requested).
 
 ## Exile system
 `/user_exile` (formerly `/user_remove`, renamed) is a permanent ban: it removes the member from the enlist sheet AND either reserve block (whichever they're found on), clears departments/accountability, strips roles, then appends `[Discord ID, Username, Former Rank]` to the **"Blacklisted"** tab (GID `2111784594`, no header row — same append/clear convention as the Demerits tab).
