@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findUser, removeDemerit } = require("../sheets");
+const { buildDemeritRemoveEmbed } = require("../notifyEmbeds");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -30,10 +31,8 @@ module.exports = {
       return interaction.editReply({ content: `❌ **${username}** has no demerits to remove.` });
     }
 
-    const dmText = newCount === 0
-      ? `✅ A demerit has been removed by <@${interaction.user.id}> for: *${reason}*. You now have no demerits.`
-      : `✅ A demerit has been removed by <@${interaction.user.id}> for: *${reason}*. You are now at **${newCount}/3** demerits.`;
-    await targetUser.send(dmText).catch(() => null);
+    const { embed, files } = buildDemeritRemoveEmbed({ count: newCount, reason, officerId: interaction.user.id });
+    await targetUser.send({ embeds: [embed], files }).catch(() => null);
 
     return interaction.editReply({
       content: `✅ Demerit removed from **${username}**.\n> **Demerits:** ${newCount}/3\n> **Reason:** ${reason}`,

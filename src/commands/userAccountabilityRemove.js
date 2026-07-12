@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { removeAccountability, findUser } = require("../sheets");
+const { buildLoaRemovedEmbed } = require("../notifyEmbeds");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -29,7 +30,8 @@ module.exports = {
       });
     }
 
-    await targetUser.send(`Your LOA has been removed.\n> **Reason:** ${reason}\n> **Removed by:** <@${interaction.user.id}>`).catch(() => null);
+    const { embed, files } = buildLoaRemovedEmbed({ reason, officerId: interaction.user.id });
+    await targetUser.send({ embeds: [embed], files }).catch(() => null);
 
     return interaction.editReply({
       content: `✅ LOA removed for **${username}**.\n> **Reason:** ${reason}`,

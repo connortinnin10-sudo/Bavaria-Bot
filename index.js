@@ -8,6 +8,7 @@ process.on("unhandledRejection", (err) => {
 
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const { clearExpiredAccountabilities, isExiled } = require("./src/sheets");
+const { buildLoaActiveEmbed, buildLoaEndedEmbed } = require("./src/notifyEmbeds");
 require("dotenv").config();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.DirectMessages] });
@@ -62,8 +63,8 @@ async function runDailyCheck(client) {
     for (const entry of activated) {
       try {
         const user = await client.users.fetch(entry.userId);
-        const approvedBy = entry.officerId ? `\n> **Approved by:** <@${entry.officerId}>` : "";
-        await user.send(`✅ Your LOA is now active.\n> **Leave:** ${entry.leaveDate}\n> **Return:** ${entry.returnDate}${approvedBy}`);
+        const { embed, files } = buildLoaActiveEmbed({ leaveDate: entry.leaveDate, returnDate: entry.returnDate, officerId: entry.officerId });
+        await user.send({ embeds: [embed], files });
       } catch {}
       await delay(500);
     }
@@ -71,7 +72,8 @@ async function runDailyCheck(client) {
     for (const entry of deactivated) {
       try {
         const user = await client.users.fetch(entry.userId);
-        await user.send(`Your LOA from ${entry.leaveDate} to ${entry.returnDate} has ended.`);
+        const { embed, files } = buildLoaEndedEmbed({ leaveDate: entry.leaveDate, returnDate: entry.returnDate });
+        await user.send({ embeds: [embed], files });
       } catch {}
       await delay(500);
     }

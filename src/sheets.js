@@ -593,7 +593,16 @@ async function clearExpiredAccountabilities() {
     const ret   = parseDate(returnDate);
 
     if (ret && ret < today) {
-      // Return date passed — deactivate and clear row
+      // Return date passed — deactivate and clear row.
+      // Re-check this exact row is still present first: guards against a concurrent
+      // run (e.g. an overlapping bot restart from a redeploy) having already cleared
+      // it, which would otherwise double-send the "LOA ended" DM.
+      const freshRow = await sheets.spreadsheets.values.get({
+        spreadsheetId: SHEET_ID,
+        range: `${ACCOUNTABILITY_TAB}!A${i + 1}:A${i + 1}`,
+      });
+      if ((freshRow.data.values?.[0]?.[0] ?? "").toString().trim() !== userId) continue;
+
       const current = await findUser(userId);
       if (current) {
         await sheets.spreadsheets.values.update({

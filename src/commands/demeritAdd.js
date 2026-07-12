@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findUser, getDemeritCount, addDemerit } = require("../sheets");
+const { buildDemeritAddEmbed } = require("../notifyEmbeds");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -31,19 +32,8 @@ module.exports = {
     const newCount = await addDemerit(targetUser.id, reason, interaction.user.id);
     const username = (record.rowData[2] ?? targetUser.username).toString();
 
-    let dmText;
-    if (newCount >= 3) {
-      dmText = [
-        `⚠️ You have received demerit **3/3** for: *${reason}*`,
-        `You've received 3/3 demerits. You're currently pending to be transferred to the regiment's reserve company. To contest this, contact <@${interaction.user.id}>.`,
-      ].join("\n");
-    } else {
-      dmText = [
-        `⚠️ You have received demerit **${newCount}/3** for: *${reason}*`,
-        `To contest this demerit, contact <@${interaction.user.id}>.`,
-      ].join("\n");
-    }
-    await targetUser.send(dmText).catch(() => null);
+    const { embed, files } = buildDemeritAddEmbed({ count: newCount, reason, officerId: interaction.user.id });
+    await targetUser.send({ embeds: [embed], files }).catch(() => null);
 
     return interaction.editReply({
       content: `✅ Demerit issued to **${username}**.\n> **Demerits:** ${newCount}/3\n> **Reason:** ${reason}`,

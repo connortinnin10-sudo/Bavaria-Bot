@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findUser, getActiveAccountability, applyAccountability } = require("../sheets");
+const { buildLoaActiveEmbed } = require("../notifyEmbeds");
 
 const DATE_REGEX = /^\d{1,2}\/\d{1,2}\/\d{2}$/;
 
@@ -73,7 +74,8 @@ module.exports = {
     const result = await applyAccountability({ userId: targetUser.id, leaveDate, returnDate, reason, officerId: interaction.user.id });
 
     if (result?.isToday) {
-      await targetUser.send(`✅ Your LOA is now active.\n> **Leave:** ${leaveDate}\n> **Return:** ${returnDate}\n> **Reason:** ${reason}\n> **Approved by:** <@${interaction.user.id}>`).catch(() => null);
+      const { embed, files } = buildLoaActiveEmbed({ leaveDate, returnDate, reason, officerId: interaction.user.id });
+      await targetUser.send({ embeds: [embed], files }).catch(() => null);
     }
 
     return interaction.editReply({
