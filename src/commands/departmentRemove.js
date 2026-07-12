@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { removeFromDepartment, findUser } = require("../sheets");
+const { buildDepartmentRemovedEmbed } = require("../notifyEmbeds");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -54,6 +55,9 @@ module.exports = {
         console.error(`Failed to remove department role:`, err.message)
       );
     }
+
+    const { embed, files } = buildDepartmentRemovedEmbed({ department, officerId: interaction.user.id });
+    await targetUser.send({ embeds: [embed], files }).catch(() => null);
 
     return interaction.editReply({
       content: `✅ **${name}** has been removed from **${department}**.`,

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { addToDepartment, findUser } = require("../sheets");
+const { buildDepartmentAddedEmbed } = require("../notifyEmbeds");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -64,6 +65,9 @@ module.exports = {
         console.error(`Failed to add department role:`, err.message)
       );
     }
+
+    const { embed, files } = buildDepartmentAddedEmbed({ department, officerId: interaction.user.id });
+    await targetUser.send({ embeds: [embed], files }).catch(() => null);
 
     return interaction.editReply({
       content: `✅ **${username}** has been added to **${department}**.\n> **Rank:** ${rank}`,

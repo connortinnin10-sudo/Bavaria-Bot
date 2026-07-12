@@ -117,6 +117,26 @@ function buildExileClearedEmbed({ officerId }) {
   return buildEmbed(SUCCESS_GREEN, "Exile Lifted", description);
 }
 
+// /department_add
+function buildDepartmentAddedEmbed({ department, officerId }) {
+  const description = [
+    `✅ You have been added to **${department}**.`,
+    `> **Approved by:** <@${officerId}>`,
+  ].join("\n");
+
+  return buildEmbed(BAVARIAN_BLUE, "Added to Department", description);
+}
+
+// /department_remove
+function buildDepartmentRemovedEmbed({ department, officerId }) {
+  const description = [
+    `You have been removed from **${department}**.`,
+    `> **Approved by:** <@${officerId}>`,
+  ].join("\n");
+
+  return buildEmbed(BAVARIAN_BLUE, "Removed from Department", description);
+}
+
 module.exports = {
   buildDemeritAddEmbed,
   buildDemeritRemoveEmbed,
@@ -127,4 +147,6 @@ module.exports = {
   buildLoaEndedEmbed,
   buildExileEmbed,
   buildExileClearedEmbed,
+  buildDepartmentAddedEmbed,
+  buildDepartmentRemovedEmbed,
 };
