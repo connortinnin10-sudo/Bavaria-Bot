@@ -48,7 +48,7 @@ module.exports = {
     );
 
     return interaction.editReply({
-      content: `✅ **${username || targetUser.username}** has been transferred from **${fromCompany}** to **${toCompany}**.\n> **Rank:** ${rank || "Unknown"}\n> Kills, KPE, activity, and attendance history carried over.`,
+      content: `✅ **${username || targetUser.username}** has been transferred from **${fromCompany}** to **${toCompany}**.\n> **Rank:** ${rank || "Unknown"}\n> Attendance history carried over. Kills, KPE, and activity% will recalculate automatically.`,
     });
   },
 };

@@ -8,11 +8,17 @@ const ENLIST_READ_START  = 15; // read from row 15 (includes all command/officer
 const ENLIST_START_ROW   = 23; // write only from row 23
 const ENLIST_END_ROW     = 68;
 
-// Full per-member roster row: G=Rank ... N=Activity%, then O:AB are the cycle's
-// 14 weekly attendance checkboxes. AC onward is the (computed, not per-row) leaderboard.
-const ROSTER_ROW_START_COL = "G";
-const ROSTER_ROW_END_COL   = "AB";
-const ROSTER_ROW_WIDTH     = 22;
+// Per-member roster row layout: G:K are real data (rank, timezone, name, LOA,
+// discord ID). L=Kills and M=KPE are looked up off the Name (I); N=Activity% is
+// computed off the weekly checkboxes. Those three (L:N) are formula-driven and
+// must never be read/written as static values. O:AB are the cycle's 14 weekly
+// attendance checkboxes (real toggle data). AC onward is a computed leaderboard.
+const ROSTER_CORE_START_COL       = "G";
+const ROSTER_CORE_END_COL         = "K";
+const ROSTER_CORE_WIDTH           = 5;
+const ROSTER_ATTENDANCE_START_COL = "O";
+const ROSTER_ATTENDANCE_END_COL   = "AB";
+const ROSTER_ATTENDANCE_WIDTH     = 14;
 
 const COL = {
   RANK:     { letter: "G", idx: 0 },
@@ -231,9 +237,12 @@ async function enlistUser({ userId, username, company, timezone, rank }) {
   });
 }
 
-// Moves an enlisted member's full roster row (rank, timezone, name, Discord ID,
-// kills, KPE, activity%, and all weekly attendance checkboxes) to the first open
-// row on the other company's sheet, then clears the old row entirely.
+// Moves an enlisted member's core fields (rank, timezone, name, LOA, Discord ID)
+// and weekly attendance checkboxes to the first open row on the other company's
+// sheet, then clears the old row. Kills/KPE/Activity% (L:N) are intentionally
+// never touched — Kills and KPE are looked up off the Name, and Activity% is
+// computed off the checkboxes, so they recalculate on their own once the name
+// and checkboxes land in the new row.
 async function transferCompany(userId) {
   const found = await findUser(userId);
   if (!found) return null;
@@ -245,15 +254,22 @@ async function transferCompany(userId) {
 
   const sheets = getSheetsClient();
 
-  // Read the full per-member row from the source tab
-  const sourceRes = await sheets.spreadsheets.values.get({
-    spreadsheetId: SHEET_ID,
-    range: `${found.tabName}!${ROSTER_ROW_START_COL}${found.rowNumber}:${ROSTER_ROW_END_COL}${found.rowNumber}`,
-  });
-  const sourceRow = sourceRes.data.values?.[0] ?? [];
+  const [coreRes, attendanceRes] = await Promise.all([
+    sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${found.tabName}!${ROSTER_CORE_START_COL}${found.rowNumber}:${ROSTER_CORE_END_COL}${found.rowNumber}`,
+    }),
+    sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${found.tabName}!${ROSTER_ATTENDANCE_START_COL}${found.rowNumber}:${ROSTER_ATTENDANCE_END_COL}${found.rowNumber}`,
+    }),
+  ]);
   // Pad to full width so trailing blank cells overwrite any stale data already
   // sitting in the destination row (removeUser only clears G:K, not the rest).
-  const fullRowData = Array.from({ length: ROSTER_ROW_WIDTH }, (_, i) => sourceRow[i] ?? "");
+  const coreRow       = coreRes.data.values?.[0] ?? [];
+  const attendanceRow = attendanceRes.data.values?.[0] ?? [];
+  const paddedCore       = Array.from({ length: ROSTER_CORE_WIDTH },       (_, i) => coreRow[i] ?? "");
+  const paddedAttendance = Array.from({ length: ROSTER_ATTENDANCE_WIDTH }, (_, i) => attendanceRow[i] ?? "");
 
   // Find the first open row on the target company (same rule as enlistUser)
   const targetRows = await fetchEnlistRows(targetInfo.name, ENLIST_START_ROW);
@@ -266,7 +282,8 @@ async function transferCompany(userId) {
   }
   if (targetRowNumber === null) throw new Error("NO_SPACE");
 
-  await writeRow(targetInfo.name, ROSTER_ROW_START_COL, ROSTER_ROW_END_COL, targetRowNumber, fullRowData);
+  await writeRow(targetInfo.name, ROSTER_CORE_START_COL, ROSTER_CORE_END_COL, targetRowNumber, paddedCore);
+  await writeRow(targetInfo.name, ROSTER_ATTENDANCE_START_COL, ROSTER_ATTENDANCE_END_COL, targetRowNumber, paddedAttendance);
 
   // Re-apply checkbox validation on column J (LOA), same as enlistUser
   await sheets.spreadsheets.batchUpdate({
@@ -287,17 +304,21 @@ async function transferCompany(userId) {
     },
   });
 
-  // Clear the entire old row on the source company
+  // Clear the old row's core fields and attendance checkboxes — L:N left untouched
   await sheets.spreadsheets.values.clear({
     spreadsheetId: SHEET_ID,
-    range: `${found.tabName}!${ROSTER_ROW_START_COL}${found.rowNumber}:${ROSTER_ROW_END_COL}${found.rowNumber}`,
+    range: `${found.tabName}!${ROSTER_CORE_START_COL}${found.rowNumber}:${ROSTER_CORE_END_COL}${found.rowNumber}`,
+  });
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: SHEET_ID,
+    range: `${found.tabName}!${ROSTER_ATTENDANCE_START_COL}${found.rowNumber}:${ROSTER_ATTENDANCE_END_COL}${found.rowNumber}`,
   });
 
   return {
     fromCompany: found.company,
     toCompany:   targetCompany,
-    rank:        (fullRowData[COL.RANK.idx] ?? "").toString().trim(),
-    username:    (fullRowData[COL.NAME.idx] ?? "").toString().trim(),
+    rank:        (paddedCore[COL.RANK.idx] ?? "").toString().trim(),
+    username:    (paddedCore[COL.NAME.idx] ?? "").toString().trim(),
   };
 }
 
