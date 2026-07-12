@@ -7,7 +7,10 @@ const LOG_COLOR    = 0x1E5AA8; // BAVARIAN_BLUE, same as notifyEmbeds.js
 
 let webhookClient = null;
 if (process.env.LOG_WEBHOOK_URL) {
-  webhookClient = new WebhookClient({ url: process.env.LOG_WEBHOOK_URL });
+  // retries: 0 — Discord's webhook execute endpoint has no idempotency key, so
+  // an automatic retry after a timeout/ECONNRESET can post a genuine duplicate
+  // message if the original request actually succeeded server-side.
+  webhookClient = new WebhookClient({ url: process.env.LOG_WEBHOOK_URL }, { rest: { retries: 0 } });
 } else {
   console.warn("[commandLog] LOG_WEBHOOK_URL not set — command logging disabled");
 }
