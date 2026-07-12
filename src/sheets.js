@@ -429,6 +429,8 @@ async function promoteUser(userId, newRank) {
 const ACCOUNTABILITY_TAB = "Accountability";
 const J_COL_IDX          = 9;  // column J (LOA checkbox), 0-based absolute index
 
+const BLACKLIST_TAB  = "Blacklisted"; // A=Discord ID, B=Username, C=Former Rank
+
 const DEMERIT_GID    = 958952891;
 const DEMERIT_TAB    = "Demerits";
 const CORNFLOWER_BLUE = { red: 0.788, green: 0.859, blue: 0.973 }; // #c9dbf8
@@ -940,4 +942,38 @@ async function removeAllDemerits() {
   return affectedIds;
 }
 
-module.exports = { enlistUser, removeUser, getStats, findUser, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff };
+// Add a member to the Blacklisted tab (Discord ID, Username, Former Rank)
+async function exileUser({ userId, username, rank }) {
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: `${BLACKLIST_TAB}!A:C`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [["'" + userId, username, rank]] },
+  });
+}
+
+async function isExiled(userId) {
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${BLACKLIST_TAB}!A:A` });
+  const rows = res.data.values ?? [];
+  return rows.some(r => (r[0] ?? "").toString().trim() === userId.toString());
+}
+
+// Returns true if a blacklist entry was found and cleared, false otherwise
+async function clearExile(userId) {
+  const sheets = getSheetsClient();
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${BLACKLIST_TAB}!A:C` });
+  const rows = res.data.values ?? [];
+
+  const rowIndex = rows.findIndex(r => (r[0] ?? "").toString().trim() === userId.toString());
+  if (rowIndex === -1) return false;
+
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: SHEET_ID,
+    range: `${BLACKLIST_TAB}!A${rowIndex + 1}:C${rowIndex + 1}`,
+  });
+  return true;
+}
+
+module.exports = { enlistUser, removeUser, getStats, findUser, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile };

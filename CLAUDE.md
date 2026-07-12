@@ -12,7 +12,7 @@ Railway does NOT read from the gitignored `.env` file. Any `process.env.*` that 
 ## Key files
 - `index.js` — bot entry point, centralized `deferReply`, fresh member fetch before every command patches `interaction.member._roles` directly
 - `src/sheets.js` — all Google Sheets read/write logic
-- `src/permissions.js` — `hasAnyRole()` helper + `PROTECTED_ROLE_IDS` set
+- `src/permissions.js` — `hasAnyRole()` helper + `PROTECTED_ROLE_IDS` set + `PROTECTED_RANKS` set (Sergent and above)
 - `src/commands/` — one file per command
 
 ## Protected roles (never removed from any user)
@@ -37,7 +37,8 @@ Hardcoded in `src/permissions.js`:
 | Command | Description |
 |---|---|
 | `/user_enlist` | Enlist a recruit — rank auto-determined from reserve status (see below) |
-| `/user_remove` | Remove from regiment, strip roles, restore guest role |
+| `/user_exile` | Permanently ban: remove from all sheets (incl. reserves), blacklist them (see below) |
+| `/user_clear_exile` | Clear an exile so the member can be enlisted/targeted again |
 | `/user_reserve` | Move to veteran/mercenary reserve, DMs the user (see below) |
 | `/user_rank_change` | Swap rank role on sheet and Discord |
 | `/user_loa` | Place member on LOA |
@@ -84,6 +85,13 @@ Both blocks are followed by read-only stat/attendance columns (kills, activity %
 
 ### Rank locking
 `/user_rank_change` blocks with a clear message if the target is found on either reserve block (checked before the existing `PROTECTED_RANKS` officer-rank check).
+
+## Exile system
+`/user_exile` (formerly `/user_remove`, renamed) is a permanent ban: it removes the member from the enlist sheet AND either reserve block (whichever they're found on), clears departments/accountability, strips roles, then appends `[Discord ID, Username, Former Rank]` to the **"Blacklisted"** tab (GID `2111784594`, no header row — same append/clear convention as the Demerits tab).
+
+Enforcement is centralized in `index.js`, not per-command: right after the fresh-member-fetch patch and before `command.execute()`, it calls `isExiled()` on whatever the interaction's `user` option resolves to. If that user is blacklisted, the command is blocked with a generic message — this covers every current and future command that takes a `user` option, with no per-command changes needed. The only exemption is `/user_clear_exile` itself (`EXILE_CHECK_EXEMPT` set in `index.js`), so it can target an exiled user to clear them via `clearExile()`.
+
+Because command registration changed (`user_remove` → `user_exile`, plus new `user_clear_exile`), `npm run deploy` (`src/deploy-commands.js`) must be re-run against Discord's API for the new/renamed slash commands to actually appear — a `git push` alone only updates the running bot process, not Discord's registered command list.
 
 ## Discord role IDs (from .env)
 ```

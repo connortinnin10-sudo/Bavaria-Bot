@@ -7,7 +7,7 @@ process.on("unhandledRejection", (err) => {
 });
 
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
-const { clearExpiredAccountabilities } = require("./src/sheets");
+const { clearExpiredAccountabilities, isExiled } = require("./src/sheets");
 require("dotenv").config();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.DirectMessages] });
@@ -16,7 +16,8 @@ client.commands = new Collection();
 
 const commands = [
   require("./src/commands/enlist"),
-  require("./src/commands/regimentRemove"),
+  require("./src/commands/userExile"),
+  require("./src/commands/userClearExile"),
   require("./src/commands/stats"),
   require("./src/commands/addDepartment"),
   require("./src/commands/departmentRemove"),
@@ -31,6 +32,10 @@ const commands = [
   require("./src/commands/demeritRemove"),
   require("./src/commands/demeritRemoveAll"),
 ];
+
+// /user_clear_exile must stay able to target exiled users; every other
+// command that takes a "user" option is blocked from touching them.
+const EXILE_CHECK_EXEMPT = new Set(["user_clear_exile"]);
 
 for (const command of commands) {
   client.commands.set(command.data.name, command);
@@ -131,6 +136,16 @@ client.on("interactionCreate", async (interaction) => {
       const freshMember = await interaction.guild.members.fetch({ user: interaction.user.id, force: true }).catch(() => null);
       if (freshMember?._roles) interaction.member._roles = freshMember._roles;
     }
+
+    if (!EXILE_CHECK_EXEMPT.has(interaction.commandName)) {
+      const targetUser = interaction.options.getUser("user");
+      if (targetUser && await isExiled(targetUser.id)) {
+        return interaction.editReply({
+          content: `⛔ **${targetUser.username}** is exiled and cannot be enlisted or have commands run on them. Use \`/user_clear_exile\` first.`,
+        });
+      }
+    }
+
     await command.execute(interaction);
   } catch (err) {
     if (err?.code === 10062 || err?.code === 40060) return; // expired or already handled by another instance
