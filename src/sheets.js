@@ -592,8 +592,10 @@ async function clearExpiredAccountabilities() {
     const leave = parseDate(leaveDate);
     const ret   = parseDate(returnDate);
 
-    if (ret && ret < today) {
-      // Return date passed — deactivate and clear row.
+    if (ret && ret <= today) {
+      // Return date has arrived (or passed) — deactivate and clear row. The return
+      // date itself is the first day back, mirroring how the leave date is already
+      // the first inactive day for activation below.
       // Re-check this exact row is still present first: guards against a concurrent
       // run (e.g. an overlapping bot restart from a redeploy) having already cleared
       // it, which would otherwise double-send the "LOA ended" DM.
