@@ -106,7 +106,7 @@ module.exports = {
 
     // DM the recruit a welcome embed with company staff tags and channel links
     const staff = await getCompanyStaff(company);
-    const { embed, files } = buildWelcomeEmbed({ userId: targetUser.id, company, staff });
+    const { embed, files } = buildWelcomeEmbed({ userId: targetUser.id, company, rank, staff });
     let dmFailed = false;
     await targetUser.send({ embeds: [embed], files }).catch(() => { dmFailed = true; });
 

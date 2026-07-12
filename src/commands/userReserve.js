@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findUser, removeUser, removeFromAllDepartments, findReserveUser, reserveUser, parseUsername } = require("../sheets");
 const { PROTECTED_ROLE_IDS, PROTECTED_RANKS } = require("../permissions");
+const { buildVeteranReserveEmbed, buildMercenaryReserveEmbed } = require("../welcomeEmbed");
 
 const DEPT_ROLES = {
   "Recruitment Department": "1224512938983952475",
@@ -91,9 +92,11 @@ module.exports = {
       console.error("Failed to set nickname:", err.message)
     );
 
-    // TODO (future, user will provide more detail): expand this DM with more context once
-    // available — do not build this out further now.
-    await targetUser.send(`You were moved to reserves by <@${interaction.user.id}>.`).catch(() => null);
+    // DM the appropriate reserve welcome embed based on type
+    const { embed, files } = type === "veteran"
+      ? buildVeteranReserveEmbed({ userId: targetUser.id })
+      : buildMercenaryReserveEmbed({ userId: targetUser.id });
+    await targetUser.send({ embeds: [embed], files }).catch(() => null);
 
     return interaction.editReply({
       content: `✅ **${username}** has been moved to the ${type} reserve roster.\n> **Rank on file:** ${rank}\n> ${enlistRecord ? "Removed from regiment sheet and departments." : "Was not on the active roster."}`,
