@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { enlistUser, findUser, parseUsername, findReserveUser, removeReserveUser, getCompanyStaff } = require("../sheets");
-const { buildWelcomeEmbed } = require("../welcomeEmbed");
+const { buildWelcomeEmbed, buildVeteranWelcomeBackEmbed } = require("../welcomeEmbed");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -104,9 +104,12 @@ module.exports = {
       console.error("Failed to set nickname:", err.message)
     );
 
-    // DM the recruit a welcome embed with company staff tags and channel links
+    // DM the recruit a welcome embed with company staff tags and channel links.
+    // Returning veterans get a distinct "welcome back" embed instead of the standard one.
     const staff = await getCompanyStaff(company);
-    const { embed, files } = buildWelcomeEmbed({ userId: targetUser.id, company, rank, staff });
+    const { embed, files } = reserveRecord?.type === "veteran"
+      ? buildVeteranWelcomeBackEmbed({ userId: targetUser.id, rank, company, staff })
+      : buildWelcomeEmbed({ userId: targetUser.id, company, rank, staff });
     let dmFailed = false;
     await targetUser.send({ embeds: [embed], files }).catch(() => { dmFailed = true; });
 

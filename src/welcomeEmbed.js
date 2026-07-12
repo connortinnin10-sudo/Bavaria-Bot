@@ -10,11 +10,17 @@ const CHANNEL_IDS = {
   bulletin:          "1196472533025820766",
   fieldManual:       "1193819667505107024",
   enlistmentRequest: "1193817245407785000",
+  announcements:     "1226982191083556904",
 };
 
 function formatStaffLine({ position, discordId, name }) {
   const tag = discordId ? `<@${discordId}>` : name;
   return `*${position}*, ${tag}`;
+}
+
+function formatStaffLineDash({ position, discordId, name }) {
+  const tag = discordId ? `<@${discordId}>` : name;
+  return `*${position}* — ${tag}`;
 }
 
 function buildEmbed(title, description) {
@@ -85,6 +91,46 @@ function buildWelcomeEmbed({ userId, company, rank, staff }) {
   ].join("\n");
 
   return buildEmbed(`Welcome to the 2. Linien-Infanterie-Regiment "Kronprinz"`, description);
+}
+
+function buildVeteranWelcomeBackEmbed({ userId, rank, company, staff }) {
+  const mention = `<@${userId}>`;
+
+  const description = [
+    `Welcome back, ${rank}, ${mention}, to active service within Bavaria.`,
+    ``,
+    `Your previous service to Bavaria is recognized, and we look forward to seeing you once again serving alongside your fellow soldiers.`,
+    ``,
+    `A quick refresh on our important channels:`,
+    ``,
+    `📅 Schedule — <#${CHANNEL_IDS.eventSchedule}>`,
+    ``,
+    `⚔️ Deployments — <#${CHANNEL_IDS.deploymentOrders}>`,
+    ``,
+    `📢 Announcements — <#${CHANNEL_IDS.announcements}>`,
+    ``,
+    `📖 Guidebook — <#${CHANNEL_IDS.fieldManual}>`,
+    ``,
+    `**-**`,
+    ``,
+    `## KOMPANIE ASSIGNMENT`,
+    ``,
+    `You have been assigned to **${company}**.`,
+    ``,
+    `Etat-Major`,
+    ...staff.etatMajor.map(formatStaffLineDash),
+    ``,
+    `Petit Etat-Major`,
+    ...staff.petitEtatMajor.map(formatStaffLineDash),
+    ``,
+    `If you have **any questions** regarding your assignment or returning to active duty, please don't hesitate to contact your company leadership.`,
+    ``,
+    `**-**`,
+    ``,
+    `We wish you the best in your renewed service to Bavaria and look forward to seeing you on the battlefield once again.`,
+  ].join("\n");
+
+  return buildEmbed(`Welcome Back to the 2. Linien-Infanterie-Regiment "Kronprinz"`, description);
 }
 
 function buildVeteranReserveEmbed({ userId }) {
@@ -159,4 +205,4 @@ function buildMercenaryReserveEmbed({ userId }) {
   return buildEmbed("Welcome to the Bavarian Mercenary Kompanie", description);
 }
 
-module.exports = { buildWelcomeEmbed, buildVeteranReserveEmbed, buildMercenaryReserveEmbed };
+module.exports = { buildWelcomeEmbed, buildVeteranWelcomeBackEmbed, buildVeteranReserveEmbed, buildMercenaryReserveEmbed };
