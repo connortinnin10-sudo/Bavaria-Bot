@@ -42,6 +42,9 @@ const commands = [
 // command that takes a "user" option is blocked from touching them.
 const EXILE_CHECK_EXEMPT = new Set(["user_clear_exile"]);
 
+// Read-only / self-service commands that don't need a command-log entry.
+const COMMAND_LOG_EXEMPT = new Set(["my_stats", "honours_sync"]);
+
 for (const command of commands) {
   client.commands.set(command.data.name, command);
 }
@@ -167,12 +170,14 @@ client.on("interactionCreate", async (interaction) => {
 
     await command.execute(interaction);
 
-    await logCommand({
-      commandName: interaction.commandName,
-      officerId: interaction.user.id,
-      targetUser,
-      reason: interaction.options.getString("reason"),
-    });
+    if (!COMMAND_LOG_EXEMPT.has(interaction.commandName)) {
+      await logCommand({
+        commandName: interaction.commandName,
+        officerId: interaction.user.id,
+        targetUser,
+        reason: interaction.options.getString("reason"),
+      });
+    }
   } catch (err) {
     if (err?.code === 10062 || err?.code === 40060) return; // expired or already handled by another instance
     console.error(err);

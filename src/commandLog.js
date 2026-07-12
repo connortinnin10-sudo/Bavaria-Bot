@@ -1,4 +1,5 @@
 const { EmbedBuilder, AttachmentBuilder, WebhookClient } = require("discord.js");
+require("dotenv").config();
 
 const CREST_PATH   = "./assets/regiment-crest.png";
 const CREST_ATTACH = "regiment-crest.png";
