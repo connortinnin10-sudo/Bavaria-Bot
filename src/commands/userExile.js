@@ -6,6 +6,7 @@ const {
   exileUser,
 } = require("../sheets");
 const { PROTECTED_ROLE_IDS } = require("../permissions");
+const { buildExileEmbed } = require("../notifyEmbeds");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -13,12 +14,16 @@ module.exports = {
     .setDescription("Permanently exile a member: remove from all sheets and blacklist them")
     .addUserOption((opt) =>
       opt.setName("user").setDescription("The member to exile").setRequired(true)
+    )
+    .addStringOption((opt) =>
+      opt.setName("reason").setDescription("Reason for the exile").setRequired(true)
     ),
 
   async execute(interaction) {
 
     const targetUser   = interaction.options.getUser("user");
     if (targetUser.bot) return interaction.editReply({ content: "This command cannot be used on bots." });
+    const reason = interaction.options.getString("reason").trim();
     const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
     if (!targetMember) {
@@ -50,7 +55,11 @@ module.exports = {
     if (accountability) await removeAccountability(targetUser.id);
 
     // Blacklist them so they can never be re-enlisted or have commands run on them
-    await exileUser({ userId: targetUser.id, username: storedUsername, rank });
+    await exileUser({ userId: targetUser.id, username: storedUsername, rank, reason });
+
+    // DM the target so they know why they were exiled
+    const { embed, files } = buildExileEmbed({ reason, officerId: interaction.user.id });
+    await targetUser.send({ embeds: [embed], files }).catch(() => null);
 
     // Remove all roles except permanently protected ones
     const rolesToRemove = targetMember.roles.cache.filter(
@@ -75,7 +84,7 @@ module.exports = {
     );
 
     return interaction.editReply({
-      content: `⛔ **${cleanNick}** has been exiled from the regiment.\n> Cleared from all sheets, including reserves. Roles reset, guest role restored.\n> **Former rank:** ${rank}\n> They cannot be re-enlisted or have any commands run on them until \`/user_clear_exile\` is used.`,
+      content: `⛔ **${cleanNick}** has been exiled from the regiment.\n> Cleared from all sheets, including reserves. Roles reset, guest role restored.\n> **Former rank:** ${rank}\n> **Reason:** ${reason}\n> They cannot be re-enlisted or have any commands run on them until \`/user_clear_exile\` is used.`,
     });
   },
 };

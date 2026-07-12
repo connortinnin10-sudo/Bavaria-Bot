@@ -8,6 +8,7 @@ process.on("unhandledRejection", (err) => {
 
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const { clearExpiredAccountabilities, isExiled } = require("./src/sheets");
+const { hasAnyRole, ROLE_ETAT_MAJOR, COMMAND_PERMISSIONS } = require("./src/permissions");
 const { buildLoaActiveEmbed, buildLoaEndedEmbed } = require("./src/notifyEmbeds");
 require("dotenv").config();
 
@@ -145,6 +146,18 @@ client.on("interactionCreate", async (interaction) => {
       if (targetUser && await isExiled(targetUser.id)) {
         return interaction.editReply({
           content: `⛔ **${targetUser.username}** is exiled and cannot be enlisted or have commands run on them. Use \`/user_clear_exile\` first.`,
+        });
+      }
+    }
+
+    // Role-based permission gate — État-Major bypasses every command; all other
+    // commands require one of the roles listed in COMMAND_PERMISSIONS.
+    if (interaction.member) {
+      const allowedExtraRoles = COMMAND_PERMISSIONS[interaction.commandName] ?? [];
+      const isEtatMajor = hasAnyRole(interaction.member, ROLE_ETAT_MAJOR);
+      if (!isEtatMajor && !hasAnyRole(interaction.member, ...allowedExtraRoles)) {
+        return interaction.editReply({
+          content: "⛔ You do not have permission to use this command.",
         });
       }
     }

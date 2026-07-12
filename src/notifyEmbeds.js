@@ -5,6 +5,7 @@ const CREST_ATTACH = "regiment-crest.png";
 
 const BAVARIAN_BLUE = 0x1E5AA8;
 const SUCCESS_GREEN  = 0x639922;
+const EXILE_RED       = 0x8B0000;
 
 // Mirrors the demerit severity ramp used for cell-coloring in sheets.js (DEMERIT_COLORS)
 const DEMERIT_EMBED_COLORS = {
@@ -95,6 +96,27 @@ function buildLoaEndedEmbed({ leaveDate, returnDate }) {
   return buildEmbed(BAVARIAN_BLUE, "LOA Ended", description);
 }
 
+// /user_exile
+function buildExileEmbed({ reason, officerId }) {
+  const description = [
+    `⛔ You have been exiled from the regiment by <@${officerId}>.`,
+    `> **Reason:** ${reason}`,
+    `You cannot be re-enlisted or have any commands run on you until your exile is lifted.`,
+  ].join("\n");
+
+  return buildEmbed(EXILE_RED, "Exiled", description);
+}
+
+// /user_clear_exile
+function buildExileClearedEmbed({ officerId }) {
+  const description = [
+    `✅ Your exile has been lifted by <@${officerId}>.`,
+    `You may now be re-enlisted or have commands run on you again.`,
+  ].join("\n");
+
+  return buildEmbed(SUCCESS_GREEN, "Exile Lifted", description);
+}
+
 module.exports = {
   buildDemeritAddEmbed,
   buildDemeritRemoveEmbed,
@@ -103,4 +125,6 @@ module.exports = {
   buildLoaActiveEmbed,
   buildLoaRemovedEmbed,
   buildLoaEndedEmbed,
+  buildExileEmbed,
+  buildExileClearedEmbed,
 };

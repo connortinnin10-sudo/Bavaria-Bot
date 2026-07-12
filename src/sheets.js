@@ -533,7 +533,7 @@ async function promoteUser(userId, newRank) {
 const ACCOUNTABILITY_TAB = "Accountability";
 const J_COL_IDX          = 9;  // column J (LOA checkbox), 0-based absolute index
 
-const BLACKLIST_TAB  = "Blacklisted"; // A=Discord ID, B=Username, C=Former Rank
+const BLACKLIST_TAB  = "Blacklisted"; // A=Discord ID, B=Username, C=Former Rank, D=Reason
 
 const DEMERIT_GID    = 958952891;
 const DEMERIT_TAB    = "Demerits";
@@ -1070,14 +1070,14 @@ async function removeAllDemerits() {
   return affectedIds;
 }
 
-// Add a member to the Blacklisted tab (Discord ID, Username, Former Rank)
-async function exileUser({ userId, username, rank }) {
+// Add a member to the Blacklisted tab (Discord ID, Username, Former Rank, Reason)
+async function exileUser({ userId, username, rank, reason }) {
   const sheets = getSheetsClient();
   await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
-    range: `${BLACKLIST_TAB}!A:C`,
+    range: `${BLACKLIST_TAB}!A:D`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [["'" + userId, username, rank]] },
+    requestBody: { values: [["'" + userId, username, rank, reason]] },
   });
 }
 
