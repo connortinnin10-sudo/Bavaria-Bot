@@ -556,6 +556,19 @@ function parseDate(str) {
   return isNaN(d.getTime()) ? null : d;
 }
 
+// "Today" as a date-only value (midnight, local Date object) in America/New_York,
+// not the server's raw local clock — Railway runs in UTC, so a naive `new Date()`
+// can already be "tomorrow" while it's still today in Eastern time, causing LOA
+// leave/return date comparisons to silently miss by a day.
+function getTodayEst() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "numeric", day: "numeric",
+  }).formatToParts(new Date());
+  const p = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return new Date(parseInt(p.year, 10), parseInt(p.month, 10) - 1, parseInt(p.day, 10));
+}
+
 async function getOrCreateAccountabilityTab() {
   const sheets = getSheetsClient();
   const meta   = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
@@ -619,7 +632,7 @@ async function applyAccountability({ userId, leaveDate, returnDate, reason, offi
   if (!record) return null;
   const sheets = getSheetsClient();
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const today = getTodayEst();
   const leave = parseDate(leaveDate);
   const isToday = leave !== null && leave.getTime() === today.getTime();
 
@@ -680,7 +693,7 @@ async function clearExpiredAccountabilities() {
   await getOrCreateAccountabilityTab();
   const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ACCOUNTABILITY_TAB}!A:G` });
   const rows = res.data.values ?? [];
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const today = getTodayEst();
 
   const activated   = [];
   const deactivated = [];
