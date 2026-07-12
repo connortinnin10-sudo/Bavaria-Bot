@@ -54,7 +54,18 @@ function buildDemeritResetEmbed() {
   return buildEmbed(SUCCESS_GREEN, "Demerits Reset", "✅ Your demerits have been reset. You now have 0/3 demerits!");
 }
 
-// /user_loa (immediate) and the automatic midnight activation in index.js
+// /user_loa — future-dated leave date (approved now, not yet active)
+function buildLoaApprovedEmbed({ leaveDate, returnDate, reason, officerId }) {
+  const description = [
+    `Your LOA has been approved for ${leaveDate} – ${returnDate}.`,
+    `> **Reason:** ${reason}`,
+    `> **Approved by:** <@${officerId}>`,
+  ].join("\n");
+
+  return buildEmbed(BAVARIAN_BLUE, "LOA Approved", description);
+}
+
+// /user_loa (leave date is today) and the automatic midnight activation in index.js
 function buildLoaActiveEmbed({ leaveDate, returnDate, reason, officerId }) {
   const description = [
     `✅ Your LOA is now active.`,
@@ -88,6 +99,7 @@ module.exports = {
   buildDemeritAddEmbed,
   buildDemeritRemoveEmbed,
   buildDemeritResetEmbed,
+  buildLoaApprovedEmbed,
   buildLoaActiveEmbed,
   buildLoaRemovedEmbed,
   buildLoaEndedEmbed,
