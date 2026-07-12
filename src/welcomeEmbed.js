@@ -212,4 +212,24 @@ function buildMercenaryReserveEmbed({ userId }) {
   return buildEmbed("Welcome to the Bavarian Mercenary Kompanie", description);
 }
 
-module.exports = { buildWelcomeEmbed, buildVeteranWelcomeBackEmbed, buildVeteranReserveEmbed, buildMercenaryReserveEmbed };
+// /transfer_company — sent to the member with their new company's staff tags.
+function buildTransferEmbed({ userId, company, staff }) {
+  const mention      = `<@${userId}>`;
+  const companyLabel = `**FÜSILIER-KOMPANIE ${company.toUpperCase()}**`;
+
+  const description = [
+    `You have been transferred to ${companyLabel}, ${mention}.`,
+    ``,
+    `Report to your new company staff for further instruction.`,
+    ``,
+    `🌿 *Etat Major*`,
+    ...staff.etatMajor.map(formatStaffLine),
+    ``,
+    `🌿 *Petit Etat Major*`,
+    ...staff.petitEtatMajor.map(formatStaffLine),
+  ].join("\n");
+
+  return buildEmbed("Company Transfer", description);
+}
+
+module.exports = { buildWelcomeEmbed, buildVeteranWelcomeBackEmbed, buildVeteranReserveEmbed, buildMercenaryReserveEmbed, buildTransferEmbed };

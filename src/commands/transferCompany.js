@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { transferCompany } = require("../sheets");
+const { transferCompany, getCompanyStaff } = require("../sheets");
+const { buildTransferEmbed } = require("../welcomeEmbed");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -46,6 +47,11 @@ module.exports = {
     await targetMember.roles.add(NEW_ROLE).catch((err) =>
       console.error("Failed to add new company role:", err.message)
     );
+
+    // DM the member their new company assignment and staff
+    const staff = await getCompanyStaff(toCompany);
+    const { embed, files } = buildTransferEmbed({ userId: targetUser.id, company: toCompany, staff });
+    await targetUser.send({ embeds: [embed], files }).catch(() => null);
 
     return interaction.editReply({
       content: `✅ **${username || targetUser.username}** has been transferred from **${fromCompany}** to **${toCompany}**.\n> **Rank:** ${rank || "Unknown"}\n> Attendance history carried over. Kills, KPE, and activity% will recalculate automatically.`,
