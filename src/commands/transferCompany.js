@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { transferCompany, getCompanyStaff } = require("../sheets");
 const { buildTransferEmbed } = require("../welcomeEmbed");
+const { sendRosenheimWelcome } = require("../welcomeLog");
 const { COMPANY_ROLES } = require("../permissions");
 
 module.exports = {
@@ -86,6 +87,11 @@ module.exports = {
     const staff = await getCompanyStaff(toCompany);
     const { embed, files } = buildTransferEmbed({ userId: targetUser.id, company: toCompany, staff });
     await targetUser.send({ embeds: [embed], files }).catch(() => null);
+
+    // Announce new Rosenheim arrivals to the company welcome webhook.
+    if (toCompany === "Rosenheim") {
+      await sendRosenheimWelcome({ userId: targetUser.id });
+    }
 
     const graduationNote = fromDonauworth
       ? "\n> Graduated from Donauworth induction — promoted to **Soldat**."
