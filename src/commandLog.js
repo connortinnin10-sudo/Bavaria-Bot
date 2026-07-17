@@ -1,3 +1,8 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN COMMAND-LOG WEBHOOK  (env: LOG_WEBHOOK_URL)
+// Logs every slash-command invocation for the officer audit trail.
+// NOT the Rosenheim enlistment webhook — that's ROSENHEIM_WEBHOOK_URL in welcomeLog.js.
+// ─────────────────────────────────────────────────────────────────────────────
 const { EmbedBuilder, AttachmentBuilder, WebhookClient } = require("discord.js");
 require("dotenv").config();
 

@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { enlistUser, enlistToDonauworth, pickBalancedCompany, findUser, parseUsername, findReserveUser, removeReserveUser, getCompanyStaff } = require("../sheets");
 const { buildDonauworthWelcomeEmbed, buildVeteranWelcomeBackEmbed } = require("../welcomeEmbed");
+const { sendRosenheimWelcome } = require("../welcomeLog");
 const { COMPANY_ROLES, PROTECTED_RANKS } = require("../permissions");
 
 const RANK_ROLES = {
@@ -94,6 +95,11 @@ module.exports = {
       const dmNote = dmFailed
         ? `\n> ⚠️ Could not send the welcome DM — **${displayName}**'s DMs appear to be closed.`
         : "";
+
+      // Veterans auto-balanced into Rosenheim get announced too — same as a transfer.
+      if (company === "Rosenheim") {
+        await sendRosenheimWelcome({ userId: targetUser.id });
+      }
 
       return interaction.editReply({
         content: `✅ **${displayName}** has been re-enlisted from the veteran reserve.\n> **Company:** ${company} (auto-assigned by headcount)\n> **Timezone:** ${timezone}\n> **Rank:** ${rank} (restored)\n> **Nickname updated to:** ${newNickname}${dmNote}`,

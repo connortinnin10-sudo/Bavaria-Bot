@@ -129,6 +129,16 @@ DISCORD_GUILD_ID=1193239194395476008
 ## Command logging
 Every slash command invocation is logged to a Discord webhook, styled like the DM embeds (crest thumbnail, `BAVARIAN_BLUE` accent). `src/commandLog.js` exports `logCommand({ commandName, officerId, targetUser, reason })`, called centrally from `index.js` right after `await command.execute(interaction)` succeeds — no per-command changes needed for new commands to get logged automatically. Only commands that actually ran are logged (permission-denied / exile-blocked short-circuits never reach this point). Sends via `WebhookClient` using the `LOG_WEBHOOK_URL` env var; if that var is unset, `logCommand` no-ops with a console warning rather than throwing — **remember to set `LOG_WEBHOOK_URL` in the Railway dashboard**, not just `.env`, or logging silently does nothing in production (the same Railway env var pitfall noted above).
 
+## Webhooks (there are two — do not confuse them)
+The bot posts to two **separate** Discord webhooks, each with its own env var and module. Both must be set in the **Railway dashboard** (not just `.env`) or they silently no-op in production:
+
+| Purpose | Env var | Module | Fires when |
+|---|---|---|---|
+| **Admin command log** (officer audit trail) | `LOG_WEBHOOK_URL` | `src/commandLog.js` → `logCommand()` | after every successful slash command, centrally from `index.js` |
+| **Rosenheim enlistment announcement** | `ROSENHEIM_WEBHOOK_URL` | `src/welcomeLog.js` → `sendRosenheimWelcome()` | anyone lands in Rosenheim — `/transfer_company` into Rosenheim, or a veteran auto-balanced into Rosenheim via `/user_enlist` |
+
+Rosenheim-only for now; the plan is to expand `sendRosenheimWelcome` to a per-company welcome (company + webhook) later. Never hardcode a webhook URL in committed code — it's a credential; read from env (pushing a hardcoded URL gets blocked as a committed secret).
+
 ## Technical notes
 - `interaction.member._roles` — raw role ID array from gateway, use this instead of `member.roles.cache` to avoid stale cache issues
 - `interaction.member = freshMember` silently fails (non-writable). Patch via `interaction.member._roles = freshMember._roles`

@@ -1,3 +1,8 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ROSENHEIM ENLISTMENT WEBHOOK  (env: ROSENHEIM_WEBHOOK_URL)
+// Announces new arrivals into Rosenheim so the company can welcome them.
+// NOT the admin/command-log webhook — that's LOG_WEBHOOK_URL in commandLog.js.
+// ─────────────────────────────────────────────────────────────────────────────
 const { EmbedBuilder, AttachmentBuilder, WebhookClient } = require("discord.js");
 require("dotenv").config();
 
