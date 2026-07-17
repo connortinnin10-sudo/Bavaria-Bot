@@ -25,6 +25,7 @@ const PROTECTED_RANKS = new Set([
 const COMPANY_ROLES = {
   Bayreuth:  "1193814561401344010",
   Rosenheim: "1506735371353063555",
+  Grenadier: "1193814779161215107",
 };
 
 const ROLE_ETAT_MAJOR        = "1193239194571649045"; // full access to every command

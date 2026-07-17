@@ -37,19 +37,25 @@ module.exports = {
       });
     }
 
-    // If currently enlisted, carry their rank over as a veteran; otherwise mercenary
+    // Veteran status only applies to Soldat+ members (rank carried over, locked).
+    // Conscripts — including trial members sitting in Donauwörth — and anyone not
+    // currently enlisted go to the mercenary block at the Conscript rank.
     const enlistRecord = await findUser(targetUser.id);
+    const currentRank  = enlistRecord ? (enlistRecord.rowData[0] ?? "").toString().trim() : "";
     let type, rank;
-    if (enlistRecord) {
+    if (enlistRecord && currentRank && currentRank !== "Conscript") {
       type = "veteran";
-      rank = (enlistRecord.rowData[0] ?? "").toString().trim() || "Soldat";
+      rank = currentRank;
       if (PROTECTED_RANKS.has(rank)) rank = "Caporal-Fourrier";
+    } else {
+      type = "mercenary";
+      rank = "Conscript";
+    }
+    // Clear their active roster row + departments either way, if they were enlisted.
+    if (enlistRecord) {
       const storedUsername = (enlistRecord.rowData[2] ?? "").toString().trim();
       await removeUser(targetUser.id);
       if (storedUsername) await removeFromAllDepartments(storedUsername);
-    } else {
-      type = "mercenary";
-      rank = "Soldat";
     }
 
     // Write to reserve sheet

@@ -37,6 +37,22 @@ const COMPANY_GID = {
   Grenadier: 161563671,
 };
 
+// Donauworth is the induction/trial holding sheet — fresh recruits and
+// re-enlisting mercenaries land here as Conscript before graduating to a
+// company via transferCompany(). Different layout than a company roster:
+// no LOA checkbox, Discord ID sits at J instead of K, and K/L (attended
+// induction, transfer status) are dropdowns the bot never writes to.
+const DONAUWORTH_GID       = 1702557097;
+const DONAUWORTH_START_ROW = 27;
+const DONAUWORTH_END_ROW   = 56;
+
+const DONAUWORTH_COL = {
+  RANK:     { letter: "G", idx: 0 },
+  TIMEZONE: { letter: "H", idx: 1 },
+  NAME:     { letter: "I", idx: 2 },
+  DISCORD:  { letter: "J", idx: 3 },
+};
+
 // Company staff block (Kompaniestab): C=Rank, D=Name, rows 21-26.
 // Position is implied by row index, not read from a column.
 const STAFF_ROWS = [
@@ -150,6 +166,17 @@ async function fetchEnlistRows(tabName, startRow = ENLIST_READ_START) {
   return res.data.values ?? [];
 }
 
+// Donauworth uses its own row range and a G:L read window (Discord ID at J,
+// dropdowns at K/L) rather than the company G:N layout.
+async function fetchDonauworthRows(tabName, startRow = DONAUWORTH_START_ROW) {
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${tabName}!G${startRow}:L${DONAUWORTH_END_ROW}`,
+  });
+  return res.data.values ?? [];
+}
+
 // A row is available if column G (rank, idx 0) is empty
 function isEnlistRowAvailable(row) {
   return (row[0] ?? "").toString().trim() === "";
@@ -177,7 +204,9 @@ async function clearRow(tabName, rowNumber) {
   });
 }
 
-// Search both company tabs for a Discord user ID
+// Search the company tabs and the Donauworth induction tab for a Discord user ID.
+// Both layouts keep rank at idx 0 and name at idx 2, so callers reading
+// rowData[0]/rowData[2] work regardless of which sheet the row came from.
 async function findUser(userId) {
   const tabNames = await getTabNames();
   for (const [company, gid] of Object.entries(COMPANY_GID)) {
@@ -193,6 +222,24 @@ async function findUser(userId) {
           rowNumber: ENLIST_READ_START + i,
           rowData:   rows[i],
           company,
+        };
+      }
+    }
+  }
+
+  // Donauworth induction tab (Discord ID at column J / idx 3)
+  const dInfo = tabNames[DONAUWORTH_GID];
+  if (dInfo) {
+    const rows = await fetchDonauworthRows(dInfo.name, DONAUWORTH_START_ROW);
+    for (let i = 0; i < rows.length; i++) {
+      const discordId = (rows[i][DONAUWORTH_COL.DISCORD.idx] ?? "").toString().trim();
+      if (discordId === userId) {
+        return {
+          tabName:   dInfo.name,
+          sheetId:   dInfo.sheetId,
+          rowNumber: DONAUWORTH_START_ROW + i,
+          rowData:   rows[i],
+          company:   "Donauworth",
         };
       }
     }
@@ -245,39 +292,105 @@ async function enlistUser({ userId, username, company, timezone, rank }) {
   });
 }
 
-// Moves an enlisted member's core fields (rank, timezone, name, LOA, Discord ID)
-// and weekly attendance checkboxes to the first open row on the other company's
+// Writes a fresh recruit / re-enlisting mercenary into the Donauworth induction
+// tab as a Conscript. Layout differs from a company roster: G=rank, H=timezone,
+// I=name, J=Discord ID (no LOA checkbox), and K/L dropdowns are left untouched.
+async function enlistToDonauworth({ userId, username, timezone }) {
+  const tabNames = await getTabNames();
+  const info     = tabNames[DONAUWORTH_GID];
+  if (!info) throw new Error("No tab found for Donauworth");
+
+  const rows = await fetchDonauworthRows(info.name, DONAUWORTH_START_ROW);
+
+  // Loop the full declared range, not rows.length — the Sheets API drops
+  // trailing blank rows, same reasoning as enlistUser.
+  let targetRowNumber = null;
+  for (let i = 0; i < (DONAUWORTH_END_ROW - DONAUWORTH_START_ROW + 1); i++) {
+    if (isEnlistRowAvailable(rows[i] ?? [])) {
+      targetRowNumber = DONAUWORTH_START_ROW + i;
+      break;
+    }
+  }
+  if (targetRowNumber === null) throw new Error("NO_SPACE");
+
+  // G=rank, H=timezone, I=name, J=discordId — no checkbox validation needed.
+  await writeRow(info.name, "G", "J", targetRowNumber, ["Conscript", timezone, username, "'" + userId]);
+  return { tabName: info.name, rowNumber: targetRowNumber };
+}
+
+// Returns whichever of the two Fusilier companies (Bayreuth/Rosenheim) currently
+// has fewer occupied roster rows, so a restored veteran fills the thinner line.
+// Grenadier is deliberately excluded — it is managed separately. Ties → Bayreuth.
+async function pickBalancedCompany() {
+  const tabNames = await getTabNames();
+  const counts = {};
+  for (const company of ["Bayreuth", "Rosenheim"]) {
+    const info = tabNames[COMPANY_GID[company]];
+    if (!info) { counts[company] = Infinity; continue; }
+    const rows = await fetchEnlistRows(info.name, ENLIST_START_ROW);
+    let occupied = 0;
+    for (let i = 0; i < (ENLIST_END_ROW - ENLIST_START_ROW + 1); i++) {
+      if (!isEnlistRowAvailable(rows[i] ?? [])) occupied++;
+    }
+    counts[company] = occupied;
+  }
+  return counts.Rosenheim < counts.Bayreuth ? "Rosenheim" : "Bayreuth";
+}
+
+// Moves a member's core fields (rank, timezone, name, LOA, Discord ID) and weekly
+// attendance checkboxes to the first open row on the chosen destination company's
 // sheet, then clears the old row. Kills/KPE/Activity% (L:N) are intentionally
 // never touched — Kills and KPE are looked up off the Name, and Activity% is
 // computed off the checkboxes, so they recalculate on their own once the name
 // and checkboxes land in the new row.
-async function transferCompany(userId) {
+//
+// Two source paths:
+//  - Donauworth (trial graduation): source layout is G:J, no attendance history
+//    exists yet, and the member is promoted to Soldat on the way out.
+//  - Company → company: rank/timezone/LOA/attendance carried over unchanged.
+async function transferCompany(userId, destinationCompany) {
   const found = await findUser(userId);
   if (!found) return null;
 
-  const targetCompany = found.company === "Bayreuth" ? "Rosenheim" : "Bayreuth";
+  const targetCompany = destinationCompany;
+  if (!COMPANY_GID[targetCompany]) throw new Error(`No tab found for company: ${targetCompany}`);
+  if (found.company === targetCompany) throw new Error("SAME_COMPANY");
+
   const tabNames  = await getTabNames();
   const targetInfo = tabNames[COMPANY_GID[targetCompany]];
   if (!targetInfo) throw new Error(`No tab found for company: ${targetCompany}`);
 
   const sheets = getSheetsClient();
+  const fromDonauworth = found.company === "Donauworth";
 
-  const [coreRes, attendanceRes] = await Promise.all([
-    sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: `${found.tabName}!${ROSTER_CORE_START_COL}${found.rowNumber}:${ROSTER_CORE_END_COL}${found.rowNumber}`,
-    }),
-    sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: `${found.tabName}!${ROSTER_ATTENDANCE_START_COL}${found.rowNumber}:${ROSTER_ATTENDANCE_END_COL}${found.rowNumber}`,
-    }),
-  ]);
-  // Pad to full width so trailing blank cells overwrite any stale data already
-  // sitting in the destination row (removeUser only clears G:K, not the rest).
-  const coreRow       = coreRes.data.values?.[0] ?? [];
-  const attendanceRow = attendanceRes.data.values?.[0] ?? [];
-  const paddedCore       = Array.from({ length: ROSTER_CORE_WIDTH },       (_, i) => coreRow[i] ?? "");
-  const paddedAttendance = Array.from({ length: ROSTER_ATTENDANCE_WIDTH }, (_, i) => attendanceRow[i] ?? "");
+  let paddedCore, paddedAttendance;
+  if (fromDonauworth) {
+    // Donauworth row is G:J (rank, timezone, name, Discord ID). Promote to Soldat,
+    // re-prefix the Discord ID with ' to keep it text, default LOA false, and start
+    // with a clean attendance slate (no history to carry).
+    const timezone  = (found.rowData[DONAUWORTH_COL.TIMEZONE.idx] ?? "").toString().trim();
+    const name      = (found.rowData[DONAUWORTH_COL.NAME.idx] ?? "").toString().trim();
+    const discordId = (found.rowData[DONAUWORTH_COL.DISCORD.idx] ?? "").toString().trim();
+    paddedCore       = ["Soldat", timezone, name, false, "'" + discordId];
+    paddedAttendance = Array.from({ length: ROSTER_ATTENDANCE_WIDTH }, () => "");
+  } else {
+    const [coreRes, attendanceRes] = await Promise.all([
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SHEET_ID,
+        range: `${found.tabName}!${ROSTER_CORE_START_COL}${found.rowNumber}:${ROSTER_CORE_END_COL}${found.rowNumber}`,
+      }),
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SHEET_ID,
+        range: `${found.tabName}!${ROSTER_ATTENDANCE_START_COL}${found.rowNumber}:${ROSTER_ATTENDANCE_END_COL}${found.rowNumber}`,
+      }),
+    ]);
+    // Pad to full width so trailing blank cells overwrite any stale data already
+    // sitting in the destination row (removeUser only clears G:K, not the rest).
+    const coreRow       = coreRes.data.values?.[0] ?? [];
+    const attendanceRow = attendanceRes.data.values?.[0] ?? [];
+    paddedCore       = Array.from({ length: ROSTER_CORE_WIDTH },       (_, i) => coreRow[i] ?? "");
+    paddedAttendance = Array.from({ length: ROSTER_ATTENDANCE_WIDTH }, (_, i) => attendanceRow[i] ?? "");
+  }
 
   // Find the first open row on the target company (same rule as enlistUser).
   // Loop over the full declared range, not targetRows.length — see the same
@@ -315,15 +428,23 @@ async function transferCompany(userId) {
     },
   });
 
-  // Clear the old row's core fields and attendance checkboxes — L:N left untouched
-  await sheets.spreadsheets.values.clear({
-    spreadsheetId: SHEET_ID,
-    range: `${found.tabName}!${ROSTER_CORE_START_COL}${found.rowNumber}:${ROSTER_CORE_END_COL}${found.rowNumber}`,
-  });
-  await sheets.spreadsheets.values.clear({
-    spreadsheetId: SHEET_ID,
-    range: `${found.tabName}!${ROSTER_ATTENDANCE_START_COL}${found.rowNumber}:${ROSTER_ATTENDANCE_END_COL}${found.rowNumber}`,
-  });
+  // Clear the old row. Donauworth only ever has G:J (K/L are officer dropdowns);
+  // a company row clears core G:K plus attendance O:AB, leaving L:N untouched.
+  if (fromDonauworth) {
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: SHEET_ID,
+      range: `${found.tabName}!G${found.rowNumber}:J${found.rowNumber}`,
+    });
+  } else {
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: SHEET_ID,
+      range: `${found.tabName}!${ROSTER_CORE_START_COL}${found.rowNumber}:${ROSTER_CORE_END_COL}${found.rowNumber}`,
+    });
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: SHEET_ID,
+      range: `${found.tabName}!${ROSTER_ATTENDANCE_START_COL}${found.rowNumber}:${ROSTER_ATTENDANCE_END_COL}${found.rowNumber}`,
+    });
+  }
 
   return {
     fromCompany: found.company,
@@ -373,7 +494,17 @@ async function getCompanyStaff(company) {
 async function removeUser(userId) {
   const found = await findUser(userId);
   if (!found) return false;
-  await clearRow(found.tabName, found.rowNumber);
+  if (found.company === "Donauworth") {
+    // Donauworth's real data is G:J (Discord ID at J); K/L are officer-managed
+    // dropdowns and must be left untouched.
+    const sheets = getSheetsClient();
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: SHEET_ID,
+      range: `${found.tabName}!G${found.rowNumber}:J${found.rowNumber}`,
+    });
+  } else {
+    await clearRow(found.tabName, found.rowNumber);
+  }
   return true;
 }
 
@@ -1108,4 +1239,4 @@ async function clearExile(userId) {
   return true;
 }
 
-module.exports = { enlistUser, removeUser, getStats, findUser, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, getSheetsClient };
+module.exports = { enlistUser, enlistToDonauworth, pickBalancedCompany, removeUser, getStats, findUser, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, getSheetsClient };

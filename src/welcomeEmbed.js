@@ -97,6 +97,59 @@ function buildWelcomeEmbed({ userId, company, rank, staff }) {
   return buildEmbed(`Welcome to the 2. Linien-Infanterie-Regiment "Kronprinz"`, description);
 }
 
+// /user_enlist — fresh recruits and re-enlisting mercenaries now land in the
+// Donauwörth induction depot as Conscript (no company assignment yet), so this
+// embed has no KOMPANIE ASSIGNMENT / staff-tag section.
+// NOTE: copy below is a working draft — pending final officer-provided text.
+function buildDonauworthWelcomeEmbed({ userId, rank }) {
+  const mention = `<@${userId}>`;
+
+  const description = [
+    `**━**`,
+    ``,
+    `🥁 **REGIMENT ORDERS!**`,
+    `${rank} ${mention},`,
+    `You have been enlisted into the 2. Linien-Infanterie-Regiment "Kronprinz" and assigned to **DONAUWÖRTH**, our induction depot. Here you will complete your induction before being posted to an active company.`,
+    ``,
+    `As part of Bavaria's contingent within the Grande Armée, you march in service to His Imperial Majesty, Emperor Napoleon I. The reputation of the regiment rests upon the discipline and conduct of every soldier.`,
+    ``,
+    `📅 Event Schedule — <#${CHANNEL_IDS.eventSchedule}>`,
+    `Review upcoming drills, inspections, and engagements.`,
+    ``,
+    `⚔️ Deployment Orders — <#${CHANNEL_IDS.deploymentOrders}>`,
+    `All battle musters and official deployments shall be posted here.`,
+    ``,
+    `📢 Regimental Bulletin — <#${CHANNEL_IDS.bulletin}>`,
+    `Orders from the État-Major, promotions, commendations, and official notices.`,
+    ``,
+    `📖 Field Manual — <#${CHANNEL_IDS.fieldManual}>`,
+    `A guide for every Bavarian soldier, detailing rank progression, regulations, and military customs.`,
+    ``,
+    `**-**`,
+    ``,
+    `📯 **INDUCTION**`,
+    ``,
+    `You have been assigned to **DONAUWÖRTH** as a trial member. Attend your induction and conduct yourself in accordance with regimental regulations. Upon completing induction you will be posted to an active Füsilier-Kompanie and promoted to the rank of Soldat.`,
+    ``,
+    `**-**`,
+    ``,
+    `🎖️ **ADVANCEMENT, HONOURS, AWARDS**`,
+    ``,
+    `Every veteran once stood where you stand today. Advancement is awarded to those who distinguish themselves through steadfast attendance, discipline, loyalty, and exemplary conduct both on and off the field. You can expect to see promotions listed weekly.`,
+    ``,
+    `**━**`,
+    ``,
+    `The regiment marches as one, and every soldier strengthens its line. Carry yourself with honor, obey your officers, and stand firm beneath the Bavarian colors.`,
+    ``,
+    `Welcome to the 2. Linien-Infanterie-Regiment "Kronprinz", ${mention}.`,
+    ``,
+    `Vive la France!`,
+    `In Treue für König und Bayern!`,
+  ].join("\n");
+
+  return buildEmbed(`Welcome to the 2. Linien-Infanterie-Regiment "Kronprinz"`, description);
+}
+
 // /user_enlist — only when the recruit is coming off the veteran reserve block.
 function buildVeteranWelcomeBackEmbed({ userId, rank, company, staff }) {
   const mention = `<@${userId}>`;
@@ -200,7 +253,7 @@ function buildMercenaryReserveEmbed({ userId }) {
     ``,
     `Should you decide to enlist as a permanent member of the Bavarian Regiment, simply submit an enlistment request in <#${CHANNEL_IDS.enlistmentRequest}>.`,
     ``,
-    `Upon acceptance, you will be assigned to an active kompanie and begin your service at the rank of **SOLDAT**, where you'll have the opportunity to earn promotions through attendance, professionalism, and dedication to the regiment.`,
+    `Upon acceptance, you will begin your service at the induction depot of **DONAUWÖRTH** at the rank of **CONSCRIPT**. Once you complete your induction you will be posted to an active kompanie and promoted to **SOLDAT**, where you'll have the opportunity to earn further promotions through attendance, professionalism, and dedication to the regiment.`,
     ``,
     `**-**`,
     ``,
@@ -232,4 +285,4 @@ function buildTransferEmbed({ userId, company, staff }) {
   return buildEmbed("Company Transfer", description);
 }
 
-module.exports = { buildWelcomeEmbed, buildVeteranWelcomeBackEmbed, buildVeteranReserveEmbed, buildMercenaryReserveEmbed, buildTransferEmbed };
+module.exports = { buildWelcomeEmbed, buildDonauworthWelcomeEmbed, buildVeteranWelcomeBackEmbed, buildVeteranReserveEmbed, buildMercenaryReserveEmbed, buildTransferEmbed };

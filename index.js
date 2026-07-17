@@ -7,7 +7,7 @@ process.on("unhandledRejection", (err) => {
 });
 
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
-const { clearExpiredAccountabilities, isExiled } = require("./src/sheets");
+const { clearExpiredAccountabilities, isExiled, findUser } = require("./src/sheets");
 const { hasAnyRole, ROLE_ETAT_MAJOR, COMMAND_PERMISSIONS } = require("./src/permissions");
 const { buildLoaActiveEmbed, buildLoaEndedEmbed } = require("./src/notifyEmbeds");
 const { logCommand } = require("./src/commandLog");
@@ -41,6 +41,20 @@ const commands = [
 // /user_clear_exile must stay able to target exiled users; every other
 // command that takes a "user" option is blocked from touching them.
 const EXILE_CHECK_EXEMPT = new Set(["user_clear_exile"]);
+
+// Donauwörth "trial members" have a limited command surface — these commands are
+// blocked while a target is still in induction. (/user_exile stays available, and
+// /transfer_company is how they graduate out, so neither is listed here.)
+const TRIAL_RESTRICTED = new Set([
+  "user_loa",
+  "user_loa_remove",
+  "demerit_add",
+  "demerit_remove",
+  "demerit_remove_all",
+  "department_add",
+  "department_remove",
+  "user_rank_change",
+]);
 
 // Read-only / self-service commands that don't need a command-log entry.
 const COMMAND_LOG_EXEMPT = new Set(["my_stats", "honours_sync"]);
@@ -152,6 +166,16 @@ client.on("interactionCreate", async (interaction) => {
       if (targetUser && await isExiled(targetUser.id)) {
         return interaction.editReply({
           content: `⛔ **${targetUser.username}** is exiled and cannot be enlisted or have commands run on them. Use \`/user_clear_exile\` first.`,
+        });
+      }
+    }
+
+    // Block restricted commands against Donauwörth trial members.
+    if (targetUser && TRIAL_RESTRICTED.has(interaction.commandName)) {
+      const record = await findUser(targetUser.id);
+      if (record?.company === "Donauworth") {
+        return interaction.editReply({
+          content: `⛔ **${targetUser.username}** is a trial member in Donauwörth — this command can't be applied until they graduate to a company via \`/transfer_company\`.`,
         });
       }
     }
