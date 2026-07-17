@@ -117,7 +117,7 @@ function buildExileClearedEmbed({ officerId }) {
   return buildEmbed(SUCCESS_GREEN, "Exile Lifted", description);
 }
 
-// /department_add
+// /add_recruitment-department and /add_propaganda-department
 function buildDepartmentAddedEmbed({ department, officerId }) {
   const description = [
     `✅ You have been added to **${department}**.`,
@@ -125,6 +125,19 @@ function buildDepartmentAddedEmbed({ department, officerId }) {
   ].join("\n");
 
   return buildEmbed(BAVARIAN_BLUE, "Added to Department", description);
+}
+
+// /add_flag-department — flag members carry a position and represent a company,
+// so they get a richer embed than the generic department one above.
+function buildFlagDepartmentAddedEmbed({ position, company, officerId }) {
+  const description = [
+    `✅ You have been added to the **Flag Department**.`,
+    `> **Position:** ${position}`,
+    `> **Representing:** ${company}`,
+    `> **Approved by:** <@${officerId}>`,
+  ].join("\n");
+
+  return buildEmbed(BAVARIAN_BLUE, "Added to Flag Department", description);
 }
 
 // /department_remove
@@ -148,5 +161,6 @@ module.exports = {
   buildExileEmbed,
   buildExileClearedEmbed,
   buildDepartmentAddedEmbed,
+  buildFlagDepartmentAddedEmbed,
   buildDepartmentRemovedEmbed,
 };

@@ -91,12 +91,45 @@ const DEPARTMENTS = {
     fetchRange: (s, e) => `H${s}:I${e}`,
   },
   "Flag Department": {
-    startRow: 18, endRow: 39,
-    rankCol: "L", nameCol: "M",
-    rankIdx: 0,   nameIdx: 1,
+    startRow: 18, endRow: 40,
+    positionCol: "K", rankCol: "L", nameCol: "M",
+    rankIdx: 0,       nameIdx: 1,
     fetchRange: (s, e) => `L${s}:M${e}`,
+    sections: () => FLAG_SECTIONS,
   },
 };
+
+// Flag members sit in per-company sections rather than one flat list. The
+// Kommandant rows (16/17/25/33) hold permanent slot labels in column K and fall
+// outside every section — the bot must never write to or clear them.
+const FLAG_SECTIONS = {
+  Rosenheim: { startRow: 18, endRow: 22 },
+  Bayreuth:  { startRow: 26, endRow: 32 },
+  Grenadier: { startRow: 34, endRow: 40 }, // München section
+};
+
+// Row numbers the bot manages for a department: the flat startRow..endRow range,
+// or — for Flag — only the per-company section rows, skipping Kommandant slots.
+function deptMemberRows(dept) {
+  const rows = [];
+  if (dept.sections) {
+    for (const { startRow, endRow } of Object.values(dept.sections())) {
+      for (let r = startRow; r <= endRow; r++) rows.push(r);
+    }
+    return rows;
+  }
+  for (let r = dept.startRow; r <= dept.endRow; r++) rows.push(r);
+  return rows;
+}
+
+// The span a member occupies on one row. Starts at the position column where the
+// department has one (Flag's K), so a cleared row leaves no stale position behind
+// for the next occupant to inherit.
+function deptClearRange(dept, rowNumber) {
+  const startCol = dept.positionCol ?? dept.rankCol;
+  const endCol   = dept.tallyCol ?? dept.nameCol;
+  return `${startCol}${rowNumber}:${endCol}${rowNumber}`;
+}
 
 let tabNameCache = null;
 let _auth        = null;
@@ -555,6 +588,45 @@ async function addToDepartment({ userId, department, rank, username }) {
   await writeRow(deptTab.name, dept.rankCol, dept.nameCol, targetRowNumber, [rank, username]);
 }
 
+// Add a user to the Flag Department. Unlike the other two departments, flag
+// members are placed in their own company's section and carry a position label
+// in column K, so this writes K:M (position, rank, name) rather than L:M.
+async function addToFlagDepartment({ company, position, rank, username }) {
+  const tabNames = await getTabNames();
+  const deptTab  = tabNames[DEPT_GID];
+  if (!deptTab) throw new Error("Department tab not found");
+
+  const section = FLAG_SECTIONS[company];
+  if (!section) throw new Error(`Unknown company: ${company}`);
+
+  const dept   = DEPARTMENTS["Flag Department"];
+  const sheets = getSheetsClient();
+
+  // Read the whole flag block once (L:M — rank/name), then index by row number so
+  // the Kommandant rows sitting inside this span are simply never considered.
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${deptTab.name}!${dept.fetchRange(dept.startRow, dept.endRow)}`,
+  });
+  const rows   = res.data.values ?? [];
+  const rowAt  = (rowNumber) => rows[rowNumber - dept.startRow] ?? [];
+
+  // A member may only hold one flag slot — check every section, not just theirs.
+  for (const rowNumber of deptMemberRows(dept)) {
+    const existing = (rowAt(rowNumber)[dept.nameIdx] ?? "").toString().trim().toLowerCase();
+    if (existing === username.toLowerCase()) throw new Error("ALREADY_IN_DEPARTMENT");
+  }
+
+  let targetRowNumber = null;
+  for (let r = section.startRow; r <= section.endRow; r++) {
+    if (isDeptRowAvailable(rowAt(r))) { targetRowNumber = r; break; }
+  }
+  if (targetRowNumber === null) throw new Error("SECTION_FULL");
+
+  await writeRow(deptTab.name, dept.positionCol, dept.nameCol, targetRowNumber, [position, rank, username]);
+  return { rowNumber: targetRowNumber };
+}
+
 // Remove a user from ALL departments by name (used during regiment removal)
 async function removeFromAllDepartments(username) {
   const tabNames = await getTabNames();
@@ -562,20 +634,20 @@ async function removeFromAllDepartments(username) {
   if (!deptTab) return;
 
   const sheets = getSheetsClient();
-  for (const [deptName, dept] of Object.entries(DEPARTMENTS)) {
+  for (const dept of Object.values(DEPARTMENTS)) {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
       range: `${deptTab.name}!${dept.fetchRange(dept.startRow, dept.endRow)}`,
     });
-    const rows = res.data.values ?? [];
-    for (let i = 0; i < rows.length; i++) {
-      const rowName = (rows[i][dept.nameIdx] ?? "").toString().trim().toLowerCase();
+    const rows  = res.data.values ?? [];
+    const rowAt = (rowNumber) => rows[rowNumber - dept.startRow] ?? [];
+
+    for (const rowNumber of deptMemberRows(dept)) {
+      const rowName = (rowAt(rowNumber)[dept.nameIdx] ?? "").toString().trim().toLowerCase();
       if (rowName === username.toLowerCase()) {
-        const rowNumber  = dept.startRow + i;
-        const clearEnd   = dept.tallyCol ?? dept.nameCol;
         await sheets.spreadsheets.values.clear({
           spreadsheetId: SHEET_ID,
-          range: `${deptTab.name}!${dept.rankCol}${rowNumber}:${clearEnd}${rowNumber}`,
+          range: `${deptTab.name}!${deptClearRange(dept, rowNumber)}`,
         });
       }
     }
@@ -596,22 +668,22 @@ async function removeFromDepartment({ name, department }) {
     spreadsheetId: SHEET_ID,
     range: `${deptTab.name}!${dept.fetchRange(dept.startRow, dept.endRow)}`,
   });
-  const rows = res.data.values ?? [];
+  const rows  = res.data.values ?? [];
+  const rowAt = (rowNumber) => rows[rowNumber - dept.startRow] ?? [];
 
   let targetRowNumber = null;
-  for (let i = 0; i < rows.length; i++) {
-    const rowName = (rows[i][dept.nameIdx] ?? "").toString().trim().toLowerCase();
+  for (const rowNumber of deptMemberRows(dept)) {
+    const rowName = (rowAt(rowNumber)[dept.nameIdx] ?? "").toString().trim().toLowerCase();
     if (rowName === name.toLowerCase()) {
-      targetRowNumber = dept.startRow + i;
+      targetRowNumber = rowNumber;
       break;
     }
   }
   if (targetRowNumber === null) return false;
 
-  const clearEnd = dept.tallyCol ?? dept.nameCol;
   await sheets.spreadsheets.values.clear({
     spreadsheetId: SHEET_ID,
-    range: `${deptTab.name}!${dept.rankCol}${targetRowNumber}:${clearEnd}${targetRowNumber}`,
+    range: `${deptTab.name}!${deptClearRange(dept, targetRowNumber)}`,
   });
   return true;
 }
@@ -1239,4 +1311,4 @@ async function clearExile(userId) {
   return true;
 }
 
-module.exports = { enlistUser, enlistToDonauworth, pickBalancedCompany, removeUser, getStats, findUser, parseUsername, addToDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, getSheetsClient };
+module.exports = { enlistUser, enlistToDonauworth, pickBalancedCompany, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, getSheetsClient };

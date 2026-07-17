@@ -54,7 +54,9 @@ const COMMAND_PERMISSIONS = {
   demerit_add:         [ROLE_PETIT_ETAT_MAJOR],
   demerit_remove:      [ROLE_PETIT_ETAT_MAJOR, ROLE_DEPARTMENT_HEAD],
 
-  department_add:      [ROLE_DEPARTMENT_HEAD],
+  "add_recruitment-department": [ROLE_DEPARTMENT_HEAD],
+  "add_propaganda-department":  [ROLE_DEPARTMENT_HEAD],
+  "add_flag-department":        [ROLE_DEPARTMENT_HEAD],
 
   recruit_add:         [ROLE_RECRUITMENT_STAFF],
   recruit_remove:      [ROLE_RECRUITMENT_STAFF],
