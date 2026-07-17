@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { enlistUser, enlistToDonauworth, pickBalancedCompany, findUser, parseUsername, findReserveUser, removeReserveUser, getCompanyStaff } = require("../sheets");
 const { buildDonauworthWelcomeEmbed, buildVeteranWelcomeBackEmbed } = require("../welcomeEmbed");
-const { sendCompanyWelcome } = require("../welcomeLog");
+const { sendCompanyWelcome, sendEnlistmentLog } = require("../welcomeLog");
 const { COMPANY_ROLES, PROTECTED_RANKS } = require("../permissions");
 
 const RANK_ROLES = {
@@ -98,6 +98,8 @@ module.exports = {
 
       // Veterans auto-balanced into a company get announced too — same as a transfer.
       await sendCompanyWelcome({ company, userId: targetUser.id });
+      // Also log the enlistment itself (every /user_enlist is logged).
+      await sendEnlistmentLog({ userId: targetUser.id });
 
       return interaction.editReply({
         content: `✅ **${displayName}** has been re-enlisted from the veteran reserve.\n> **Company:** ${company} (auto-assigned by headcount)\n> **Timezone:** ${timezone}\n> **Rank:** ${rank} (restored)\n> **Nickname updated to:** ${newNickname}${dmNote}`,
@@ -147,6 +149,9 @@ module.exports = {
     const dmNote = dmFailed
       ? `\n> ⚠️ Could not send the welcome DM — **${displayName}**'s DMs appear to be closed.`
       : "";
+
+    // Log the enlistment (joining the regiment, distinct from a company transfer).
+    await sendEnlistmentLog({ userId: targetUser.id });
 
     return interaction.editReply({
       content: `✅ **${displayName}** has been enlisted to **Donauwörth** for induction.\n> **Timezone:** ${timezone}\n> **Rank:** ${rank}${reserveRecord ? " (re-enlisted from mercenary reserve)" : ""}\n> **Nickname updated to:** ${newNickname}${dmNote}`,

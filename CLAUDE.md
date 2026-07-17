@@ -135,9 +135,10 @@ The bot posts to two **separate** Discord webhooks, each with its own env var an
 | Purpose | Env var | Module | Fires when |
 |---|---|---|---|
 | **Admin command log** (officer audit trail) | `LOG_WEBHOOK_URL` | `src/commandLog.js` → `logCommand()` | after every successful slash command, centrally from `index.js` |
-| **Rosenheim enlistment announcement** | `ROSENHEIM_WEBHOOK_URL` | `src/welcomeLog.js` → `sendRosenheimWelcome()` | anyone lands in Rosenheim — `/transfer_company` into Rosenheim, or a veteran auto-balanced into Rosenheim via `/user_enlist` |
+| **Company transfer welcome** (per company) | `ROSENHEIM_WEBHOOK_URL`, `BAYREUTH_WEBHOOK_URL` | `src/welcomeLog.js` → `sendCompanyWelcome({ company, userId })` | anyone lands in that company — `/transfer_company` into it, or a veteran auto-balanced into it via `/user_enlist` |
+| **Regiment enlistment log** | `ENLISTMENT_WEBHOOK_URL` | `src/welcomeLog.js` → `sendEnlistmentLog({ userId })` | every `/user_enlist` (both the Donauwörth induction path and the veteran re-enlist path) |
 
-Rosenheim-only for now; the plan is to expand `sendRosenheimWelcome` to a per-company welcome (company + webhook) later. Never hardcode a webhook URL in committed code — it's a credential; read from env (pushing a hardcoded URL gets blocked as a committed secret).
+`sendCompanyWelcome` is company-generic: add `GRENADIER_WEBHOOK_URL` to the `COMPANY_WEBHOOK_URLS` map + set the var to enable Grenadier, no other change. Never hardcode a webhook URL in committed code — it's a credential; read from env (pushing a hardcoded URL gets blocked as a committed secret).
 
 ## Technical notes
 - `interaction.member._roles` — raw role ID array from gateway, use this instead of `member.roles.cache` to avoid stale cache issues

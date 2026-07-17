@@ -1,12 +1,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// COMPANY TRANSFER/ENLISTMENT WEBHOOKS  (one per company)
-// Announces new arrivals into a company so its members can welcome them. A company
-// only posts if its webhook env var is set; unset companies silently no-op.
-// NOT the admin/command-log webhook — that's LOG_WEBHOOK_URL in commandLog.js.
-//   Rosenheim → ROSENHEIM_WEBHOOK_URL
-//   Bayreuth  → BAYREUTH_WEBHOOK_URL
-//   (Grenadier: add GRENADIER_WEBHOOK_URL here + set the var to enable — no other change)
-// Each MUST be set in the Railway dashboard, not just .env, or it no-ops in prod.
+// PUBLIC ANNOUNCEMENT WEBHOOKS  (NOT the admin command log — that's
+// LOG_WEBHOOK_URL in commandLog.js). Each MUST be set in the Railway dashboard,
+// not just .env, or it silently no-ops in production. Three kinds:
+//
+//  1. Company transfer welcomes — one per company, posted when a member LANDS in
+//     that company (via /transfer_company or a veteran /user_enlist):
+//       Rosenheim → ROSENHEIM_WEBHOOK_URL
+//       Bayreuth  → BAYREUTH_WEBHOOK_URL
+//       (Grenadier: add GRENADIER_WEBHOOK_URL here + set the var — no other change)
+//
+//  2. Regiment enlistment log — ENLISTMENT_WEBHOOK_URL — posted when /user_enlist
+//     is run on someone (their initial join, distinct from a company transfer).
 // ─────────────────────────────────────────────────────────────────────────────
 const { EmbedBuilder, AttachmentBuilder, WebhookClient } = require("discord.js");
 require("dotenv").config();
@@ -51,4 +55,26 @@ async function sendCompanyWelcome({ company, userId }) {
   }
 }
 
-module.exports = { sendCompanyWelcome };
+const enlistmentWebhook = process.env.ENLISTMENT_WEBHOOK_URL
+  ? new WebhookClient({ url: process.env.ENLISTMENT_WEBHOOK_URL }, { rest: { retries: 0 } })
+  : (console.warn("[welcomeLog] ENLISTMENT_WEBHOOK_URL not set — enlistment log disabled"), null);
+
+// Fires when /user_enlist is run on someone — logs their initial join to the
+// regiment. This is an enlistment, not a transfer, so it reads differently.
+async function sendEnlistmentLog({ userId }) {
+  if (!enlistmentWebhook) return;
+  try {
+    const embed = new EmbedBuilder()
+      .setColor(WELCOME_COLOR)
+      .setTitle("New Enlistment")
+      .setThumbnail(`attachment://${CREST_ATTACH}`)
+      .setDescription(`<@${userId}> has enlisted into the regiment. Welcome them!`)
+      .setTimestamp();
+    const files = [new AttachmentBuilder(CREST_PATH, { name: CREST_ATTACH })];
+    await enlistmentWebhook.send({ embeds: [embed], files });
+  } catch (err) {
+    console.error("[welcomeLog] Failed to send enlistment log:", err.message);
+  }
+}
+
+module.exports = { sendCompanyWelcome, sendEnlistmentLog };
