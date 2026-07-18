@@ -28,6 +28,10 @@ const COMPANY_ROLES = {
   Grenadier: "1193814779161215107",
 };
 
+// Donauwörth induction role — granted on /user_enlist (induction path), stripped
+// when the member graduates to a company via /transfer_company.
+const ROLE_DONAUWORTH = "1193814402592407582";
+
 const ROLE_ETAT_MAJOR        = "1193239194571649045"; // full access to every command
 const ROLE_PETIT_ETAT_MAJOR  = "1197983145060990996";
 const ROLE_DEPARTMENT_HEAD   = "1312900709888426075";
@@ -76,6 +80,7 @@ module.exports = {
   PROTECTED_ROLE_IDS,
   PROTECTED_RANKS,
   COMPANY_ROLES,
+  ROLE_DONAUWORTH,
   ROLE_ETAT_MAJOR,
   hasAnyRole,
   COMMAND_PERMISSIONS,

@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const { enlistUser, enlistToDonauworth, pickBalancedCompany, findUser, parseUsername, findReserveUser, removeReserveUser, getCompanyStaff } = require("../sheets");
 const { buildDonauworthWelcomeEmbed, buildVeteranWelcomeBackEmbed } = require("../welcomeEmbed");
 const { sendCompanyWelcome, sendEnlistmentLog } = require("../welcomeLog");
-const { COMPANY_ROLES, PROTECTED_RANKS } = require("../permissions");
+const { COMPANY_ROLES, ROLE_DONAUWORTH, PROTECTED_RANKS } = require("../permissions");
 
 const RANK_ROLES = {
   "Conscript":          process.env.RANK_ROLE_CONSCRIPT,
@@ -122,10 +122,12 @@ module.exports = {
     if (reserveRecord) await removeReserveUser(targetUser.id);
 
     // No company role yet — assigned later when they graduate via /transfer_company.
+    // The Donauwörth induction role marks them as a trial member until then.
     const rolesToAdd = [
       process.env.ROLE_REGIMENT,
       process.env.ROLE_PREMIER_CORPS,
       process.env.ROLE_GRANDE_ARMEE,
+      ROLE_DONAUWORTH,
       RANK_ROLES[rank],
     ].filter(Boolean);
 

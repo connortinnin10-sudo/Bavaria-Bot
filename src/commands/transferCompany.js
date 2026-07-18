@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const { transferCompany, getCompanyStaff } = require("../sheets");
 const { buildTransferEmbed } = require("../welcomeEmbed");
 const { sendCompanyWelcome } = require("../welcomeLog");
-const { COMPANY_ROLES } = require("../permissions");
+const { COMPANY_ROLES, ROLE_DONAUWORTH } = require("../permissions");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -73,13 +73,16 @@ module.exports = {
       );
     }
 
-    // Donauworth graduates are promoted Conscript -> Soldat; swap the rank role too.
+    // Donauworth graduates are promoted Conscript -> Soldat and lose the induction role.
     if (fromDonauworth) {
       await targetMember.roles.remove(process.env.RANK_ROLE_CONSCRIPT).catch((err) =>
         console.error("Failed to remove Conscript role:", err.message)
       );
       await targetMember.roles.add(process.env.RANK_ROLE_SOLDAT).catch((err) =>
         console.error("Failed to add Soldat role:", err.message)
+      );
+      await targetMember.roles.remove(ROLE_DONAUWORTH).catch((err) =>
+        console.error("Failed to remove Donauwörth role:", err.message)
       );
     }
 
