@@ -20,6 +20,37 @@ const PROTECTED_RANKS = new Set([
   "Colonel",
 ]);
 
+// Full rank hierarchy, lowest → highest. Used to gate specialization roles
+// (e.g. Sapper/Drummer require Caporal de Premier or higher). Note the enlisted
+// tiers use "Caporal de Premier" (space) but the top caporal tier is keyed
+// "Caporal-Fourrier" (hyphen), matching the rest of the codebase.
+const RANK_ORDER = [
+  "Conscript",
+  "Soldat",
+  "Soldat de Premier",
+  "Caporal",
+  "Caporal de Premier",
+  "Caporal-Fourrier",
+  "Sergent",
+  "Sergent Major",
+  "Adjutant",
+  "Adjutant Sous-Officier",
+  "Sous-Lieutenant",
+  "Lieutenant",
+  "Capitaine",
+  "Chef De Bataillon",
+  "Major",
+  "Colonel",
+];
+
+// True if `rank` sits at or above `minRank` in RANK_ORDER. An unknown rank string
+// returns false, which safely blocks the gated action rather than allowing it.
+function rankAtLeast(rank, minRank) {
+  const r = RANK_ORDER.indexOf((rank ?? "").toString().trim());
+  const m = RANK_ORDER.indexOf(minRank);
+  return r !== -1 && m !== -1 && r >= m;
+}
+
 // Hardcoded (not read from process.env) — Railway has silently dropped env vars
 // before, which is why DEPT_ROLES and PROTECTED_ROLE_IDS were already moved here.
 const COMPANY_ROLES = {
@@ -31,6 +62,15 @@ const COMPANY_ROLES = {
 // Donauwörth induction role — granted on /user_enlist (induction path), stripped
 // when the member graduates to a company via /transfer_company.
 const ROLE_DONAUWORTH = "1193814402592407582";
+
+// Discord roles granted on /user_assign_specialization and stripped on
+// /user_remove_specialization, keyed by position. Hardcoded (not env) for the
+// same Railway reason as COMPANY_ROLES. A position may grant more than one role.
+const SPECIALIZATION_ROLES = {
+  Sapper:     ["1361485325708562432", "1193815223891669102"], // Corps Sapper, Regiment Sapper
+  Drummer:    ["1382539832005365821"],                        // Drummer
+  "Schützen": ["1443331846401167533"],                        // Schützen
+};
 
 const ROLE_ETAT_MAJOR        = "1193239194571649045"; // full access to every command
 const ROLE_PETIT_ETAT_MAJOR  = "1197983145060990996";
@@ -71,6 +111,8 @@ const COMMAND_PERMISSIONS = {
   user_clear_exile:    [],
   demerit_remove_all:  [],
   department_remove:   [],
+  user_assign_specialization: [],
+  user_remove_specialization: [],
 
   my_stats:            [ROLE_REGIMENT],
   honours_sync:        [ROLE_REGIMENT],
@@ -79,8 +121,11 @@ const COMMAND_PERMISSIONS = {
 module.exports = {
   PROTECTED_ROLE_IDS,
   PROTECTED_RANKS,
+  RANK_ORDER,
+  rankAtLeast,
   COMPANY_ROLES,
   ROLE_DONAUWORTH,
+  SPECIALIZATION_ROLES,
   ROLE_ETAT_MAJOR,
   hasAnyRole,
   COMMAND_PERMISSIONS,

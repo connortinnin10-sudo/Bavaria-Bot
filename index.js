@@ -29,6 +29,8 @@ const commands = [
   require("./src/commands/userRankChange"),
   require("./src/commands/userReserve"),
   require("./src/commands/transferCompany"),
+  require("./src/commands/userAssignSpecialization"),
+  require("./src/commands/userRemoveSpecialization"),
   require("./src/commands/recruitAdd"),
   require("./src/commands/recruitRemove"),
   require("./src/commands/recruitClearSheet"),
@@ -58,6 +60,7 @@ const TRIAL_RESTRICTED = new Set([
   "add_flag-department",
   "department_remove",
   "user_rank_change",
+  "user_assign_specialization",
 ]);
 
 // Read-only / self-service commands that don't need a command-log entry.

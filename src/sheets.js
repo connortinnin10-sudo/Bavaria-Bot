@@ -65,6 +65,24 @@ const STAFF_ROWS = [
 ];
 const STAFF_RANGE = "C21:D26";
 
+// Specialist positions recorded on the company sheet itself, in slots separate
+// from the roster. Matched by name only (no Discord ID is stored in these cells).
+// Sapper/Drummer share the C(rank)/D(name) columns on fixed row pairs; Schützen
+// sit in AN(rank)/AO(name) across a range. Only Bayreuth/Rosenheim for now.
+const SPECIALIZATION_BLOCKS = {
+  Sapper:     { rows: [31, 32],             rankCol: "C",  nameCol: "D"  },
+  Drummer:    { rows: [33, 34],             rankCol: "C",  nameCol: "D"  },
+  "Schützen": { startRow: 15, endRow: 47,   rankCol: "AN", nameCol: "AO" },
+};
+
+// The full list of row numbers a specialization block occupies.
+function specializationRows(block) {
+  if (block.rows) return block.rows;
+  const rows = [];
+  for (let r = block.startRow; r <= block.endRow; r++) rows.push(r);
+  return rows;
+}
+
 const DEPT_GID        = parseInt(process.env.DEPT_GID, 10);
 const RESERVE_GID     = 226567638;
 const RESERVE_START   = 15;
@@ -1185,6 +1203,90 @@ async function removeReserveUser(userId) {
   return true;
 }
 
+// Reads a specialization block's rank/name columns into a Map keyed by row
+// number: rowNumber -> { rank, name }. rankCol and nameCol are adjacent, so the
+// read returns [rank, name] per row.
+async function readSpecializationBlock(tabName, block) {
+  const rows     = specializationRows(block);
+  const firstRow = rows[0];
+  const lastRow  = rows[rows.length - 1];
+  const sheets   = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${tabName}!${block.rankCol}${firstRow}:${block.nameCol}${lastRow}`,
+  });
+  const values = res.data.values ?? [];
+  const byRow  = new Map();
+  for (const rowNumber of rows) {
+    const r = values[rowNumber - firstRow] ?? [];
+    byRow.set(rowNumber, {
+      rank: (r[0] ?? "").toString().trim(),
+      name: (r[1] ?? "").toString().trim(),
+    });
+  }
+  return byRow;
+}
+
+// Every specialization slot a member (by name) currently occupies on a company
+// sheet. Returns [{ position, rowNumber }]. Match is case-insensitive/trimmed.
+async function findSpecializations(company, username) {
+  const tabNames = await getTabNames();
+  const info     = tabNames[COMPANY_GID[company]];
+  if (!info) throw new Error(`No tab found for company: ${company}`);
+
+  const target = (username ?? "").toString().trim().toLowerCase();
+  const found  = [];
+  if (target === "") return found;
+
+  for (const [position, block] of Object.entries(SPECIALIZATION_BLOCKS)) {
+    const byRow = await readSpecializationBlock(info.name, block);
+    for (const [rowNumber, { name }] of byRow) {
+      if (name.toLowerCase() === target) found.push({ position, rowNumber });
+    }
+  }
+  return found;
+}
+
+// Writes [rank, name] into the first open row of the given position's block.
+// Throws NO_SPACE if all slots are filled.
+async function assignSpecialization({ company, position, rank, username }) {
+  const tabNames = await getTabNames();
+  const info     = tabNames[COMPANY_GID[company]];
+  if (!info) throw new Error(`No tab found for company: ${company}`);
+
+  const block = SPECIALIZATION_BLOCKS[position];
+  if (!block) throw new Error(`Unknown specialization: ${position}`);
+
+  const byRow = await readSpecializationBlock(info.name, block);
+  let targetRow = null;
+  for (const rowNumber of specializationRows(block)) {
+    if ((byRow.get(rowNumber)?.name ?? "") === "") { targetRow = rowNumber; break; }
+  }
+  if (targetRow === null) throw new Error("NO_SPACE");
+
+  await writeRow(info.name, block.rankCol, block.nameCol, targetRow, [rank, username]);
+  return { rowNumber: targetRow };
+}
+
+// Clears every specialization slot the member holds on the company sheet.
+// Returns the deduped list of positions removed (empty if they held none).
+async function removeSpecialization({ company, username }) {
+  const tabNames = await getTabNames();
+  const info     = tabNames[COMPANY_GID[company]];
+  if (!info) throw new Error(`No tab found for company: ${company}`);
+
+  const matches = await findSpecializations(company, username);
+  const sheets  = getSheetsClient();
+  for (const { position, rowNumber } of matches) {
+    const block = SPECIALIZATION_BLOCKS[position];
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: SHEET_ID,
+      range: `${info.name}!${block.rankCol}${rowNumber}:${block.nameCol}${rowNumber}`,
+    });
+  }
+  return [...new Set(matches.map((m) => m.position))];
+}
+
 async function getOrCreateDemeritTab() {
   const tabNames = await getTabNames();
   const existing = Object.values(tabNames).find(t => t.name === DEMERIT_TAB);
@@ -1345,4 +1447,4 @@ async function clearExile(userId) {
   return true;
 }
 
-module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, getSheetsClient };
+module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getSheetsClient };

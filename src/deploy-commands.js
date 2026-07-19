@@ -13,6 +13,8 @@ const commands = [
   require("./commands/userRankChange").data.toJSON(),
   require("./commands/userReserve").data.toJSON(),
   require("./commands/transferCompany").data.toJSON(),
+  require("./commands/userAssignSpecialization").data.toJSON(),
+  require("./commands/userRemoveSpecialization").data.toJSON(),
   require("./commands/recruitAdd").data.toJSON(),
   require("./commands/recruitRemove").data.toJSON(),
   require("./commands/recruitClearSheet").data.toJSON(),

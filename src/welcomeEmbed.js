@@ -286,4 +286,37 @@ function buildTransferEmbed({ userId, company, staff }) {
   return buildEmbed("Company Transfer", description);
 }
 
-module.exports = { buildWelcomeEmbed, buildDonauworthWelcomeEmbed, buildVeteranWelcomeBackEmbed, buildVeteranReserveEmbed, buildMercenaryReserveEmbed, buildTransferEmbed };
+// /user_assign_specialization — sent to a member given a Sapper/Drummer/Schützen role.
+function buildSpecializationAssignEmbed({ userId, position, company }) {
+  const mention = `<@${userId}>`;
+
+  const description = [
+    `Congratulations, ${mention}!`,
+    ``,
+    `You have been assigned as a **${position}** of the **${company}** Kompanie.`,
+    ``,
+    `This is a distinguished honor and a mark of the trust your officers place in you. Carry out your new duties with discipline and pride, as befits a specialist of the 2nd Bavarian Regiment.`,
+    ``,
+    `In Treue für König und Bayern!`,
+  ].join("\n");
+
+  return buildEmbed(`Specialization Assignment — ${position}`, description);
+}
+
+// /user_remove_specialization — sent when a member is relieved of their specialist role(s).
+function buildSpecializationRemoveEmbed({ userId, positions, company }) {
+  const mention  = `<@${userId}>`;
+  const posLabel = positions.join(", ");
+
+  const description = [
+    `${mention},`,
+    ``,
+    `You have been relieved of your position as **${posLabel}** of the **${company}** Kompanie.`,
+    ``,
+    `We thank you for your service in this role. Should duty call again, you may be reassigned in the future.`,
+  ].join("\n");
+
+  return buildEmbed("Specialization Removed", description);
+}
+
+module.exports = { buildWelcomeEmbed, buildDonauworthWelcomeEmbed, buildVeteranWelcomeBackEmbed, buildVeteranReserveEmbed, buildMercenaryReserveEmbed, buildTransferEmbed, buildSpecializationAssignEmbed, buildSpecializationRemoveEmbed };
