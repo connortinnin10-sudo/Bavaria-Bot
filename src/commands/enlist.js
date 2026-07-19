@@ -121,6 +121,19 @@ module.exports = {
     // Clear the mercenary reserve record if they were re-enlisting from it.
     if (reserveRecord) await removeReserveUser(targetUser.id);
 
+    // Reset any leftover rank roles (Soldat, Caporal, etc.) so a re-enlisting
+    // mercenary or a returning former member starts clean at Conscript. Keep
+    // Conscript itself out of the strip list since we re-add it below.
+    const rankRolesToStrip = Object.entries(RANK_ROLES)
+      .filter(([name]) => name !== "Conscript")
+      .map(([, id]) => id)
+      .filter(Boolean);
+    for (const roleId of rankRolesToStrip) {
+      await targetMember.roles.remove(roleId).catch((err) =>
+        console.error(`Failed to remove rank role ${roleId}:`, err.message)
+      );
+    }
+
     // No company role yet — assigned later when they graduate via /transfer_company.
     // The Donauwörth induction role marks them as a trial member until then.
     const rolesToAdd = [
