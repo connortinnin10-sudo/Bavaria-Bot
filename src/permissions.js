@@ -90,6 +90,7 @@ function hasAnyRole(member, ...roleIds) {
 // change who can run what; it's the single source of truth for command access.
 const COMMAND_PERMISSIONS = {
   user_enlist:         [ROLE_PETIT_ETAT_MAJOR, ROLE_RECRUITMENT_DEPT],
+  add_to_regiment:     [ROLE_PETIT_ETAT_MAJOR],
   user_reserve:        [ROLE_PETIT_ETAT_MAJOR],
   transfer_company:    [ROLE_PETIT_ETAT_MAJOR],
   user_rank_change:    [ROLE_PETIT_ETAT_MAJOR],
