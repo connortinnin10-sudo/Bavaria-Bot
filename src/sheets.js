@@ -351,23 +351,47 @@ async function enlistToDonauworth({ userId, username, timezone }) {
   return { tabName: info.name, rowNumber: targetRowNumber };
 }
 
-// Returns whichever of the two Fusilier companies (Bayreuth/Rosenheim) currently
-// has fewer occupied roster rows, so a restored veteran fills the thinner line.
-// Grenadier is deliberately excluded — it is managed separately. Ties → Bayreuth.
-async function pickBalancedCompany() {
+// Returns a veteran from the reserve into a company at their retained (already
+// capped) rank. The reserve block stores no timezone, so it's passed in (blank if
+// the officer didn't supply one). Attendance starts clean; the reserve entry is
+// cleared once they're placed.
+async function returnVeteranToCompany(userId, company, timezone, reserve) {
   const tabNames = await getTabNames();
-  const counts = {};
-  for (const company of ["Bayreuth", "Rosenheim"]) {
-    const info = tabNames[COMPANY_GID[company]];
-    if (!info) { counts[company] = Infinity; continue; }
-    const rows = await fetchEnlistRows(info.name, ENLIST_START_ROW);
-    let occupied = 0;
-    for (let i = 0; i < (ENLIST_END_ROW - ENLIST_START_ROW + 1); i++) {
-      if (!isEnlistRowAvailable(rows[i] ?? [])) occupied++;
-    }
-    counts[company] = occupied;
+  const info     = tabNames[COMPANY_GID[company]];
+  if (!info) throw new Error(`No tab found for company: ${company}`);
+
+  const rank     = (reserve.rowData[2] ?? "").toString().trim() || "Soldat";
+  const username = (reserve.rowData[1] ?? "").toString().trim();
+
+  const rows = await fetchEnlistRows(info.name, ENLIST_START_ROW);
+  let targetRowNumber = null;
+  for (let i = 0; i < (ENLIST_END_ROW - ENLIST_START_ROW + 1); i++) {
+    if (isEnlistRowAvailable(rows[i] ?? [])) { targetRowNumber = ENLIST_START_ROW + i; break; }
   }
-  return counts.Rosenheim < counts.Bayreuth ? "Rosenheim" : "Bayreuth";
+  if (targetRowNumber === null) throw new Error("NO_SPACE");
+
+  // G:K = rank, timezone, name, LOA(false), discordId. Attendance O:AB blank.
+  await writeRow(info.name, ROSTER_CORE_START_COL, ROSTER_CORE_END_COL, targetRowNumber,
+    [rank, timezone ?? "", username, false, "'" + userId]);
+  await writeRow(info.name, ROSTER_ATTENDANCE_START_COL, ROSTER_ATTENDANCE_END_COL, targetRowNumber,
+    Array.from({ length: ROSTER_ATTENDANCE_WIDTH }, () => ""));
+
+  // Re-apply the LOA checkbox validation on column J, same as enlistUser.
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: {
+      requests: [{
+        setDataValidation: {
+          range: { sheetId: info.sheetId, startRowIndex: targetRowNumber - 1, endRowIndex: targetRowNumber, startColumnIndex: 9, endColumnIndex: 10 },
+          rule: { condition: { type: "BOOLEAN" }, strict: true },
+        },
+      }],
+    },
+  });
+
+  await removeReserveUser(userId);
+  return { source: "veteran-reserve", fromCompany: "Veteran Reserve", toCompany: company, rank, username };
 }
 
 // Moves a member's core fields (rank, timezone, name, LOA, Discord ID) and weekly
@@ -377,13 +401,22 @@ async function pickBalancedCompany() {
 // computed off the checkboxes, so they recalculate on their own once the name
 // and checkboxes land in the new row.
 //
-// Two source paths:
+// Source paths:
+//  - Veteran reserve: pulled off the reserve back into the chosen company at their
+//    retained rank (handled by returnVeteranToCompany). Mercenary reserve is rejected.
 //  - Donauworth (trial graduation): source layout is G:J, no attendance history
 //    exists yet, and the member is promoted to Soldat on the way out.
 //  - Company → company: rank/timezone/LOA/attendance carried over unchanged.
-async function transferCompany(userId, destinationCompany) {
+async function transferCompany(userId, destinationCompany, timezone) {
   const found = await findUser(userId);
-  if (!found) return null;
+  if (!found) {
+    // Not on a company/Donauworth roster — check the reserve block.
+    const reserve = await findReserveUser(userId);
+    if (!reserve) return null;                                 // truly not in the system
+    if (reserve.type === "mercenary") throw new Error("MERCENARY_RESERVE");
+    if (!COMPANY_GID[destinationCompany]) throw new Error(`No tab found for company: ${destinationCompany}`);
+    return await returnVeteranToCompany(userId, destinationCompany, timezone, reserve);
+  }
 
   const targetCompany = destinationCompany;
   if (!COMPANY_GID[targetCompany]) throw new Error(`No tab found for company: ${targetCompany}`);
@@ -480,6 +513,7 @@ async function transferCompany(userId, destinationCompany) {
   }
 
   return {
+    source:      fromDonauworth ? "donauworth" : "company",
     fromCompany: found.company,
     toCompany:   targetCompany,
     rank:        (paddedCore[COL.RANK.idx] ?? "").toString().trim(),
@@ -1311,4 +1345,4 @@ async function clearExile(userId) {
   return true;
 }
 
-module.exports = { enlistUser, enlistToDonauworth, pickBalancedCompany, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, getSheetsClient };
+module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, getSheetsClient };

@@ -1,8 +1,8 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { enlistUser, enlistToDonauworth, pickBalancedCompany, findUser, parseUsername, findReserveUser, removeReserveUser, getCompanyStaff } = require("../sheets");
-const { buildDonauworthWelcomeEmbed, buildVeteranWelcomeBackEmbed } = require("../welcomeEmbed");
-const { sendCompanyWelcome, sendEnlistmentLog } = require("../welcomeLog");
-const { COMPANY_ROLES, ROLE_DONAUWORTH, PROTECTED_RANKS } = require("../permissions");
+const { enlistToDonauworth, findUser, parseUsername, findReserveUser, removeReserveUser } = require("../sheets");
+const { buildDonauworthWelcomeEmbed } = require("../welcomeEmbed");
+const { sendEnlistmentLog } = require("../welcomeLog");
+const { ROLE_DONAUWORTH } = require("../permissions");
 
 const RANK_ROLES = {
   "Conscript":          process.env.RANK_ROLE_CONSCRIPT,
@@ -40,69 +40,14 @@ module.exports = {
       });
     }
 
-    // Only genuine veterans (Soldat+ on the veteran reserve) skip induction and
-    // return straight to a company at their restored rank. Everyone else —
-    // fresh recruits and mercenary-reserve members — goes through Donauwörth
-    // as a Conscript trial member.
+    // Veterans on the reserve are NOT enlisted here — they return via
+    // /transfer_company at their retained rank. Enlisting them would demote them to
+    // Conscript, so block and redirect. Mercenary-reserve members and fresh recruits
+    // continue to the Donauwörth path below as Conscript trial members.
     const reserveRecord = await findReserveUser(targetUser.id);
-    const isVeteran = reserveRecord?.type === "veteran";
-
-    if (isVeteran) {
-      let rank = (reserveRecord.rowData[2] ?? "").toString().trim() || "Soldat";
-      if (PROTECTED_RANKS.has(rank)) rank = "Caporal-Fourrier";
-
-      // Auto-assign to whichever Fusilier company is thinner on members.
-      const company = await pickBalancedCompany();
-
-      try {
-        await enlistUser({ userId: targetUser.id, username: displayName, company, timezone, rank });
-      } catch (err) {
-        if (err.message === "NO_SPACE") {
-          return interaction.editReply({
-            content: `❌ No available rows in **${company}** company. Contact an administrator.`,
-          });
-        }
-        throw err;
-      }
-      await removeReserveUser(targetUser.id);
-
-      const rolesToAdd = [
-        process.env.ROLE_REGIMENT,
-        process.env.ROLE_PREMIER_CORPS,
-        process.env.ROLE_GRANDE_ARMEE,
-        COMPANY_ROLES[company],
-        RANK_ROLES[rank],
-      ].filter(Boolean);
-
-      for (const roleId of rolesToAdd) {
-        await targetMember.roles.add(roleId).catch((err) =>
-          console.error(`Failed to add role ${roleId}:`, err.message)
-        );
-      }
-      await targetMember.roles.remove(process.env.GUEST_ROLE).catch((err) =>
-        console.error("Failed to remove guest role:", err.message)
-      );
-
-      const newNickname = `[2.] ${displayName}`;
-      await targetMember.setNickname(newNickname).catch((err) =>
-        console.error("Failed to set nickname:", err.message)
-      );
-
-      const staff = await getCompanyStaff(company);
-      const { embed, files } = buildVeteranWelcomeBackEmbed({ userId: targetUser.id, rank, company, staff });
-      let dmFailed = false;
-      await targetUser.send({ embeds: [embed], files }).catch(() => { dmFailed = true; });
-      const dmNote = dmFailed
-        ? `\n> ⚠️ Could not send the welcome DM — **${displayName}**'s DMs appear to be closed.`
-        : "";
-
-      // Veterans auto-balanced into a company get announced too — same as a transfer.
-      await sendCompanyWelcome({ company, userId: targetUser.id });
-      // Also log the enlistment itself (every /user_enlist is logged).
-      await sendEnlistmentLog({ userId: targetUser.id });
-
+    if (reserveRecord?.type === "veteran") {
       return interaction.editReply({
-        content: `✅ **${displayName}** has been re-enlisted from the veteran reserve.\n> **Company:** ${company} (auto-assigned by headcount)\n> **Timezone:** ${timezone}\n> **Rank:** ${rank} (restored)\n> **Nickname updated to:** ${newNickname}${dmNote}`,
+        content: `**${displayName}** is a veteran on reserve — use \`/transfer_company\` to bring them back at their rank.`,
       });
     }
 
