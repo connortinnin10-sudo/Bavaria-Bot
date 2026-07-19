@@ -84,6 +84,13 @@ module.exports = {
       throw err;
     }
 
+    // Strip the other company's role first so nobody ends up holding both
+    // Bayreuth and Rosenheim at once, same guarantee /transfer_company gives.
+    const otherCompany = company === "Bayreuth" ? "Rosenheim" : "Bayreuth";
+    await targetMember.roles.remove(COMPANY_ROLES[otherCompany]).catch((err) =>
+      console.error("Failed to remove other company role:", err.message)
+    );
+
     const rolesToAdd = [
       process.env.ROLE_REGIMENT,
       process.env.ROLE_PREMIER_CORPS,
