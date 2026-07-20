@@ -789,7 +789,10 @@ async function promoteUser(userId, newRank) {
   return true;
 }
 
-const ACCOUNTABILITY_TAB = "Accountability";
+// The live LOA tab (gid 699157387). Officers file LOAs here and the midnight EST
+// job reads it. Same A:G layout as before: [discordId, tabName, rowNumber,
+// leaveDate, returnDate, reason, officerId], dates DD/MM/YY.
+const ACCOUNTABILITY_TAB = "LOA";
 const J_COL_IDX          = 9;  // column J (LOA checkbox), 0-based absolute index
 
 const BLACKLIST_TAB  = "Blacklisted"; // A=Discord ID, B=Username, C=Former Rank, D=Reason
