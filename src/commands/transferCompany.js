@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const { transferCompany, getCompanyStaff } = require("../sheets");
 const { buildTransferEmbed, buildVeteranWelcomeBackEmbed } = require("../welcomeEmbed");
 const { sendCompanyWelcome } = require("../welcomeLog");
-const { COMPANY_ROLES, ROLE_DONAUWORTH, ROLE_REGIMENT, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN, ROLE_SPECIALIZATION } = require("../permissions");
+const { COMPANY_ROLES, ROLE_DONAUWORTH, ROLE_REGIMENT, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN, ROLE_SPECIALIZATION, RESERVE_EXTRA_ROLE_IDS } = require("../permissions");
 
 const RANK_ROLES = {
   "Conscript":          process.env.RANK_ROLE_CONSCRIPT,
@@ -87,6 +87,14 @@ module.exports = {
     if (NEW_ROLE) {
       await targetMember.roles.add(NEW_ROLE).catch((err) =>
         console.error("Failed to add new company role:", err.message)
+      );
+    }
+
+    // Landing in a company means leaving reserve status — strip the extra reserve
+    // grouping roles (Mercenary, Réserves du Premier Corps). No-op if not held.
+    for (const roleId of RESERVE_EXTRA_ROLE_IDS) {
+      await targetMember.roles.remove(roleId).catch((err) =>
+        console.error(`Failed to remove reserve role ${roleId}:`, err.message)
       );
     }
 

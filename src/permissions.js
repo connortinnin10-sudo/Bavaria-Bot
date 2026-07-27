@@ -41,6 +41,13 @@ const RANK_ROLE_CAPORAL_FOURRIER = "1193239194600996999";
 // further down alongside the other command-access role IDs.
 const ROLE_BAVARIA_VETERAN   = "1530414516330827826";
 
+// Extra reserve-grouping roles added to EVERY member on /user_reserve (alongside
+// ROLE_BAVARIAN_RESERVES) and stripped again on the return paths (/transfer_company
+// and /user_enlist). Hardcoded per the Railway pitfall.
+const ROLE_MERCENARY              = "1203775751577407489"; // "Mercenary"
+const ROLE_RESERVES_PREMIER_CORPS = "1234315658406269018"; // "Réserves du Premier Corps"
+const RESERVE_EXTRA_ROLE_IDS = [ROLE_MERCENARY, ROLE_RESERVES_PREMIER_CORPS];
+
 // /user_reserve strips every role a member holds EXCEPT these — the protected
 // roles (Verified, medals/awards, permission meta-roles) and the enlisted rank
 // roles. Managed roles (booster/integration) and @everyone are preserved by the
@@ -171,6 +178,7 @@ module.exports = {
   ROLE_BAVARIA_VETERAN,
   RESERVE_KEEP_ROLE_IDS,
   RANK_ROLE_CAPORAL_FOURRIER,
+  RESERVE_EXTRA_ROLE_IDS,
   hasAnyRole,
   COMMAND_PERMISSIONS,
 };

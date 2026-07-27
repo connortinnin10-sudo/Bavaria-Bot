@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findUser, removeUser, removeFromAllDepartments, findReserveUser, reserveUser, parseUsername } = require("../sheets");
-const { PROTECTED_RANKS, RESERVE_KEEP_ROLE_IDS, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN, RANK_ROLE_CAPORAL_FOURRIER } = require("../permissions");
+const { PROTECTED_RANKS, RESERVE_KEEP_ROLE_IDS, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN, RANK_ROLE_CAPORAL_FOURRIER, RESERVE_EXTRA_ROLE_IDS } = require("../permissions");
 const { buildVeteranReserveEmbed, buildMercenaryReserveEmbed } = require("../welcomeEmbed");
 const { HONOUR_ROLE_IDS } = require("../honoursSheet");
 
@@ -81,9 +81,10 @@ module.exports = {
       );
     }
 
-    // Add the reserve role to everyone; veterans (members who were actively
-    // enlisted when reserved) additionally get the Bavaria Veteran role.
-    const rolesToAdd = [ROLE_BAVARIAN_RESERVES];
+    // Add the reserve roles to everyone (Bavarian Reserves + the Mercenary and
+    // Réserves du Premier Corps grouping roles); veterans (members who were
+    // actively enlisted when reserved) additionally get the Bavaria Veteran role.
+    const rolesToAdd = [ROLE_BAVARIAN_RESERVES, ...RESERVE_EXTRA_ROLE_IDS];
     if (type === "veteran") {
       rolesToAdd.push(ROLE_BAVARIA_VETERAN);
       // Officers (Sergent+) are capped to Caporal-Fourrier on the sheet and had

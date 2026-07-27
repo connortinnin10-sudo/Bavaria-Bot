@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const { enlistToDonauworth, findUser, parseUsername, findReserveUser, removeReserveUser } = require("../sheets");
 const { buildDonauworthWelcomeEmbed } = require("../welcomeEmbed");
 const { sendEnlistmentLog } = require("../welcomeLog");
-const { ROLE_DONAUWORTH, ROLE_REGIMENT, ROLE_BAVARIAN_RESERVES } = require("../permissions");
+const { ROLE_DONAUWORTH, ROLE_REGIMENT, ROLE_BAVARIAN_RESERVES, RESERVE_EXTRA_ROLE_IDS } = require("../permissions");
 
 const RANK_ROLES = {
   "Conscript":          process.env.RANK_ROLE_CONSCRIPT,
@@ -70,6 +70,14 @@ module.exports = {
       await removeReserveUser(targetUser.id);
       await targetMember.roles.remove(ROLE_BAVARIAN_RESERVES).catch((err) =>
         console.error(`Failed to remove reserve role ${ROLE_BAVARIAN_RESERVES}:`, err.message)
+      );
+    }
+
+    // Enlisting means (re)joining the regiment proper — strip the extra reserve
+    // grouping roles (Mercenary, Réserves du Premier Corps). No-op if not held.
+    for (const roleId of RESERVE_EXTRA_ROLE_IDS) {
+      await targetMember.roles.remove(roleId).catch((err) =>
+        console.error(`Failed to remove reserve role ${roleId}:`, err.message)
       );
     }
 
