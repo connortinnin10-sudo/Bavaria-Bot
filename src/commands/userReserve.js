@@ -1,13 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findUser, removeUser, removeFromAllDepartments, findReserveUser, reserveUser, parseUsername } = require("../sheets");
-const { PROTECTED_ROLE_IDS, PROTECTED_RANKS } = require("../permissions");
+const { PROTECTED_RANKS, RESERVE_KEEP_ROLE_IDS, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN } = require("../permissions");
 const { buildVeteranReserveEmbed, buildMercenaryReserveEmbed } = require("../welcomeEmbed");
-
-const DEPT_ROLES = {
-  "Recruitment Department": "1224512938983952475",
-  "Propaganda Department":  "1224513613377568889",
-  "Flag Department":        "1193815658182492191",
-};
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -68,33 +62,31 @@ module.exports = {
       throw err;
     }
 
-    // Strip all department roles, same as a full regiment removal would
-    for (const roleId of Object.values(DEPT_ROLES)) {
-      await targetMember.roles.remove(roleId).catch((err) =>
-        console.error(`Failed to remove department role ${roleId}:`, err.message)
-      );
-    }
-
-    // TODO (future work, required — not abandoned): /user_reserve needs veteran/mercenary-specific
-    // role add/remove logic. RESERVE_ROLES_REMOVE / RESERVE_ROLES_ADD env vars don't exist anywhere
-    // today, so this block is currently a no-op. Do not delete — will be replaced once role
-    // requirements per reserve type are defined.
-    const rolesToRemove = (process.env.RESERVE_ROLES_REMOVE ?? "").split(",").map(r => r.trim()).filter(id => id && !PROTECTED_ROLE_IDS.has(id));
-    for (const roleId of rolesToRemove) {
+    // Strip every role EXCEPT the reserve keep-list (protected roles + enlisted
+    // rank roles) and managed roles (booster/integration roles can't be removed).
+    // One sweep clears the regiment, company, corps/army, Donauwörth, department,
+    // specialization, staff, and officer-rank roles. @everyone is skipped.
+    const rolesToRemove = targetMember.roles.cache.filter(
+      (role) => role.id !== interaction.guild.id && !role.managed && !RESERVE_KEEP_ROLE_IDS.has(role.id)
+    );
+    for (const roleId of rolesToRemove.keys()) {
       await targetMember.roles.remove(roleId).catch((err) =>
         console.error(`Failed to remove role ${roleId}:`, err.message)
       );
     }
 
-    const rolesToAdd = (process.env.RESERVE_ROLES_ADD ?? "").split(",").map(r => r.trim()).filter(Boolean);
+    // Add the reserve role to everyone; veterans (members who were actively
+    // enlisted when reserved) additionally get the Bavaria Veteran role.
+    const rolesToAdd = [ROLE_BAVARIAN_RESERVES];
+    if (type === "veteran") rolesToAdd.push(ROLE_BAVARIA_VETERAN);
     for (const roleId of rolesToAdd) {
       await targetMember.roles.add(roleId).catch((err) =>
         console.error(`Failed to add role ${roleId}:`, err.message)
       );
     }
 
-    // Set nickname to plain username (no [2.] prefix)
-    await targetMember.setNickname(username).catch((err) =>
+    // Keep the [2.] prefix — reserves stay tagged as regiment members.
+    await targetMember.setNickname(`[2.] ${username}`).catch((err) =>
       console.error("Failed to set nickname:", err.message)
     );
 

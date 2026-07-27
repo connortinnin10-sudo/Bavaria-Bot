@@ -20,6 +20,31 @@ const PROTECTED_RANKS = new Set([
   "Colonel",
 ]);
 
+// Enlisted rank role IDs (Conscript → Caporal-Fourrier), hardcoded per the Railway
+// env-var pitfall. Officer ranks (Sergent+) are intentionally excluded: a member
+// moved to reserve is demoted, so any officer rank role is stripped.
+const ENLISTED_RANK_ROLE_IDS = [
+  "1193239194571649053", // Conscript
+  "1193239194600996994", // Soldat
+  "1193239194600996995", // Soldat de Premier
+  "1193239194600996997", // Caporal
+  "1193239194600996998", // Caporal de Premier
+  "1193239194600996999", // Caporal-Fourrier
+];
+
+// Bavaria Veteran role — added on top of the reserve role for members who were
+// actively enlisted when moved to reserve (the veteran path in /user_reserve).
+// ROLE_BAVARIAN_RESERVES (the reserve/"merc" role added to everyone) is declared
+// further down alongside the other command-access role IDs.
+const ROLE_BAVARIA_VETERAN   = "1530414516330827826";
+
+// /user_reserve strips every role a member holds EXCEPT these — the protected
+// roles (Verified, medals/awards, permission meta-roles) and the enlisted rank
+// roles. Managed roles (booster/integration) and @everyone are preserved by the
+// command itself. Everything else — regiment, company, corps, army, Donauwörth,
+// specialization, staff/command-access, and officer rank roles — is removed.
+const RESERVE_KEEP_ROLE_IDS = new Set([...PROTECTED_ROLE_IDS, ...ENLISTED_RANK_ROLE_IDS]);
+
 // Full rank hierarchy, lowest → highest. Used to gate specialization roles
 // (e.g. Sapper/Drummer require Caporal de Premier or higher). Note the enlisted
 // tiers use "Caporal de Premier" (space) but the top caporal tier is keyed
@@ -78,7 +103,7 @@ const ROLE_DEPARTMENT_HEAD   = "1312900709888426075";
 const ROLE_RECRUITMENT_STAFF = "1371578090186342502";
 const ROLE_RECRUITMENT_DEPT  = "1224512938983952475";
 const ROLE_REGIMENT          = "1530434376553332826"; // regiment role (new)
-const ROLE_BAVARIAN_RESERVES = "1193239194529714382"; // formerly ROLE_REGIMENT — now Bavarian Reserves / "merc" (record-only; no code consumes it yet)
+const ROLE_BAVARIAN_RESERVES = "1193239194529714382"; // formerly ROLE_REGIMENT — now Bavarian Reserves / "merc" (added to everyone on /user_reserve)
 
 function hasAnyRole(member, ...roleIds) {
   const memberRoleIds = member._roles ?? [...member.roles.cache.keys()];
@@ -131,6 +156,8 @@ module.exports = {
   ROLE_ETAT_MAJOR,
   ROLE_REGIMENT,
   ROLE_BAVARIAN_RESERVES,
+  ROLE_BAVARIA_VETERAN,
+  RESERVE_KEEP_ROLE_IDS,
   hasAnyRole,
   COMMAND_PERMISSIONS,
 };

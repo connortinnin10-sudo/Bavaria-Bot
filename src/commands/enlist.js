@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const { enlistToDonauworth, findUser, parseUsername, findReserveUser, removeReserveUser } = require("../sheets");
 const { buildDonauworthWelcomeEmbed } = require("../welcomeEmbed");
 const { sendEnlistmentLog } = require("../welcomeLog");
-const { ROLE_DONAUWORTH, ROLE_REGIMENT } = require("../permissions");
+const { ROLE_DONAUWORTH, ROLE_REGIMENT, ROLE_BAVARIAN_RESERVES } = require("../permissions");
 
 const RANK_ROLES = {
   "Conscript":          process.env.RANK_ROLE_CONSCRIPT,
@@ -63,8 +63,15 @@ module.exports = {
       }
       throw err;
     }
-    // Clear the mercenary reserve record if they were re-enlisting from it.
-    if (reserveRecord) await removeReserveUser(targetUser.id);
+    // Clear the mercenary reserve record + strip the reserve role if they were
+    // re-enlisting from it. (Veterans are blocked above, so this path is merc-only —
+    // they carry the reserve role but never the Bavaria Veteran role.)
+    if (reserveRecord) {
+      await removeReserveUser(targetUser.id);
+      await targetMember.roles.remove(ROLE_BAVARIAN_RESERVES).catch((err) =>
+        console.error(`Failed to remove reserve role ${ROLE_BAVARIAN_RESERVES}:`, err.message)
+      );
+    }
 
     // Reset any leftover rank roles (Soldat, Caporal, etc.) so a re-enlisting
     // mercenary or a returning former member starts clean at Conscript. Keep

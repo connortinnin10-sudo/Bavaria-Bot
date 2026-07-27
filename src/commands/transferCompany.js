@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const { transferCompany, getCompanyStaff } = require("../sheets");
 const { buildTransferEmbed, buildVeteranWelcomeBackEmbed } = require("../welcomeEmbed");
 const { sendCompanyWelcome } = require("../welcomeLog");
-const { COMPANY_ROLES, ROLE_DONAUWORTH, ROLE_REGIMENT } = require("../permissions");
+const { COMPANY_ROLES, ROLE_DONAUWORTH, ROLE_REGIMENT, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN } = require("../permissions");
 
 const RANK_ROLES = {
   "Conscript":          process.env.RANK_ROLE_CONSCRIPT,
@@ -104,8 +104,13 @@ module.exports = {
     }
 
     // Returning veterans get their rank role + core regiment roles restored, and
-    // the [2.] nickname prefix back.
+    // the [2.] nickname prefix back — and shed the reserve + Bavaria Veteran roles.
     if (isVeteranReturn) {
+      for (const roleId of [ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN]) {
+        await targetMember.roles.remove(roleId).catch((err) =>
+          console.error(`Failed to remove reserve role ${roleId}:`, err.message)
+        );
+      }
       const rankRole = RANK_ROLES[rank];
       if (rankRole) {
         await targetMember.roles.add(rankRole).catch((err) =>
