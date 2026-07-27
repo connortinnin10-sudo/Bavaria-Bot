@@ -105,7 +105,8 @@ Because command registration changed (`user_remove` → `user_exile`, plus new `
 
 ## Discord role IDs (from .env)
 ```
-ROLE_REGIMENT=1193239194529714382
+ROLE_REGIMENT=1530434376553332826
+ROLE_BAVARIAN_RESERVES=1193239194529714382
 ROLE_PREMIER_CORPS=1193239194529714385
 ROLE_GRANDE_ARMEE=1193239194529714386
 ROLE_BAYREUTH=1193814561401344010
@@ -125,6 +126,8 @@ ROLE_DEPARTMENT_HEAD=1312900709888426075
 DEPT_GID=1958342844
 DISCORD_GUILD_ID=1193239194395476008
 ```
+
+**Regiment role swap (2026-07):** `ROLE_REGIMENT` is now `1530434376553332826`. The old regiment ID `1193239194529714382` was repurposed as the **Bavarian Reserves / "merc"** role (`ROLE_BAVARIAN_RESERVES`). The regiment ID is hardcoded in `src/permissions.js` (exported `ROLE_REGIMENT`) and consumed from there by the grant commands (`enlist.js`, `addToRegiment.js`, `transferCompany.js`) — no longer read from `process.env`, per the Railway env-var pitfall above. `STATS_ROLE_ID` in `.env` is unused and still carries the old ID.
 
 ## Command logging
 Every slash command invocation is logged to a Discord webhook, styled like the DM embeds (crest thumbnail, `BAVARIAN_BLUE` accent). `src/commandLog.js` exports `logCommand({ commandName, officerId, targetUser, reason })`, called centrally from `index.js` right after `await command.execute(interaction)` succeeds — no per-command changes needed for new commands to get logged automatically. Only commands that actually ran are logged (permission-denied / exile-blocked short-circuits never reach this point). Sends via `WebhookClient` using the `LOG_WEBHOOK_URL` env var; if that var is unset, `logCommand` no-ops with a console warning rather than throwing — **remember to set `LOG_WEBHOOK_URL` in the Railway dashboard**, not just `.env`, or logging silently does nothing in production (the same Railway env var pitfall noted above).

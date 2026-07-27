@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const { transferCompany, getCompanyStaff } = require("../sheets");
 const { buildTransferEmbed, buildVeteranWelcomeBackEmbed } = require("../welcomeEmbed");
 const { sendCompanyWelcome } = require("../welcomeLog");
-const { COMPANY_ROLES, ROLE_DONAUWORTH } = require("../permissions");
+const { COMPANY_ROLES, ROLE_DONAUWORTH, ROLE_REGIMENT } = require("../permissions");
 
 const RANK_ROLES = {
   "Conscript":          process.env.RANK_ROLE_CONSCRIPT,
@@ -112,7 +112,7 @@ module.exports = {
           console.error("Failed to add rank role:", err.message)
         );
       }
-      for (const roleId of [process.env.ROLE_REGIMENT, process.env.ROLE_PREMIER_CORPS, process.env.ROLE_GRANDE_ARMEE].filter(Boolean)) {
+      for (const roleId of [ROLE_REGIMENT, process.env.ROLE_PREMIER_CORPS, process.env.ROLE_GRANDE_ARMEE].filter(Boolean)) {
         await targetMember.roles.add(roleId).catch((err) =>
           console.error(`Failed to add role ${roleId}:`, err.message)
         );

@@ -77,7 +77,8 @@ const ROLE_PETIT_ETAT_MAJOR  = "1197983145060990996";
 const ROLE_DEPARTMENT_HEAD   = "1312900709888426075";
 const ROLE_RECRUITMENT_STAFF = "1371578090186342502";
 const ROLE_RECRUITMENT_DEPT  = "1224512938983952475";
-const ROLE_REGIMENT          = "1193239194529714382";
+const ROLE_REGIMENT          = "1530434376553332826"; // regiment role (new)
+const ROLE_BAVARIAN_RESERVES = "1193239194529714382"; // formerly ROLE_REGIMENT — now Bavarian Reserves / "merc" (record-only; no code consumes it yet)
 
 function hasAnyRole(member, ...roleIds) {
   const memberRoleIds = member._roles ?? [...member.roles.cache.keys()];
@@ -128,6 +129,8 @@ module.exports = {
   ROLE_DONAUWORTH,
   SPECIALIZATION_ROLES,
   ROLE_ETAT_MAJOR,
+  ROLE_REGIMENT,
+  ROLE_BAVARIAN_RESERVES,
   hasAnyRole,
   COMMAND_PERMISSIONS,
 };

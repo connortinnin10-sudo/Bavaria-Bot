@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { enlistUser, findUser, parseUsername, findReserveUser, removeReserveUser } = require("../sheets");
-const { COMPANY_ROLES } = require("../permissions");
+const { COMPANY_ROLES, ROLE_REGIMENT } = require("../permissions");
 
 const RANK_ROLES = {
   "Soldat":             process.env.RANK_ROLE_SOLDAT,
@@ -92,7 +92,7 @@ module.exports = {
     );
 
     const rolesToAdd = [
-      process.env.ROLE_REGIMENT,
+      ROLE_REGIMENT,
       process.env.ROLE_PREMIER_CORPS,
       process.env.ROLE_GRANDE_ARMEE,
       COMPANY_ROLES[company],
