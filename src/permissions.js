@@ -31,6 +31,9 @@ const ENLISTED_RANK_ROLE_IDS = [
   "1193239194600996998", // Caporal de Premier
   "1193239194600996999", // Caporal-Fourrier
 ];
+// Caporal-Fourrier rank role — officers (Sergent+) are demoted to this rank when
+// reserved, so /user_reserve re-adds it after the sweep strips their officer role.
+const RANK_ROLE_CAPORAL_FOURRIER = "1193239194600996999";
 
 // Bavaria Veteran role — added on top of the reserve role for members who were
 // actively enlisted when moved to reserve (the veteran path in /user_reserve).
@@ -158,6 +161,7 @@ module.exports = {
   ROLE_BAVARIAN_RESERVES,
   ROLE_BAVARIA_VETERAN,
   RESERVE_KEEP_ROLE_IDS,
+  RANK_ROLE_CAPORAL_FOURRIER,
   hasAnyRole,
   COMMAND_PERMISSIONS,
 };

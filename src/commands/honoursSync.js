@@ -1,22 +1,12 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { parseUsername } = require("../sheets");
-const {
-  fetchHonoursForUsername,
-  NOBILITY_TIER_ROLES,
-  VENERATION_RANK_ROLES,
-  GRANDBATTLE_RANK_ROLES,
-  MEDAL_ROLE_MAP,
-} = require("../honoursSheet");
+const { fetchHonoursForUsername, HONOUR_ROLE_IDS } = require("../honoursSheet");
 
 // Every role this command could ever grant — used to know which currently-held
-// roles are "ours" to remove when they're no longer earned. Never touches any
-// role outside this set.
-const MANAGED_ROLE_IDS = new Set([
-  ...Object.values(NOBILITY_TIER_ROLES),
-  ...Object.values(VENERATION_RANK_ROLES),
-  ...Object.values(GRANDBATTLE_RANK_ROLES),
-  ...Object.values(MEDAL_ROLE_MAP).flatMap((tiers) => Object.values(tiers)),
-]);
+// roles are "ours" to remove when they're no longer earned. Sourced from
+// honoursSheet so it stays in lockstep with the /user_reserve keep-list. Never
+// touches any role outside this set.
+const MANAGED_ROLE_IDS = HONOUR_ROLE_IDS;
 
 function buildNickname(currentNickname, fallbackUsername, title) {
   const base = (currentNickname ?? fallbackUsername).split(",")[0].trim();

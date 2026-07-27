@@ -1,7 +1,8 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { findUser, removeUser, removeFromAllDepartments, findReserveUser, reserveUser, parseUsername } = require("../sheets");
-const { PROTECTED_RANKS, RESERVE_KEEP_ROLE_IDS, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN } = require("../permissions");
+const { PROTECTED_RANKS, RESERVE_KEEP_ROLE_IDS, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN, RANK_ROLE_CAPORAL_FOURRIER } = require("../permissions");
 const { buildVeteranReserveEmbed, buildMercenaryReserveEmbed } = require("../welcomeEmbed");
+const { HONOUR_ROLE_IDS } = require("../honoursSheet");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -63,11 +64,16 @@ module.exports = {
     }
 
     // Strip every role EXCEPT the reserve keep-list (protected roles + enlisted
-    // rank roles) and managed roles (booster/integration roles can't be removed).
-    // One sweep clears the regiment, company, corps/army, Donauwörth, department,
+    // rank roles), earned honour roles (medals/nobility/veneration/grandbattle),
+    // and managed roles (booster/integration roles can't be removed). One sweep
+    // clears the regiment, company, corps/army, Donauwörth, department,
     // specialization, staff, and officer-rank roles. @everyone is skipped.
     const rolesToRemove = targetMember.roles.cache.filter(
-      (role) => role.id !== interaction.guild.id && !role.managed && !RESERVE_KEEP_ROLE_IDS.has(role.id)
+      (role) =>
+        role.id !== interaction.guild.id &&
+        !role.managed &&
+        !RESERVE_KEEP_ROLE_IDS.has(role.id) &&
+        !HONOUR_ROLE_IDS.has(role.id)
     );
     for (const roleId of rolesToRemove.keys()) {
       await targetMember.roles.remove(roleId).catch((err) =>
@@ -78,7 +84,13 @@ module.exports = {
     // Add the reserve role to everyone; veterans (members who were actively
     // enlisted when reserved) additionally get the Bavaria Veteran role.
     const rolesToAdd = [ROLE_BAVARIAN_RESERVES];
-    if (type === "veteran") rolesToAdd.push(ROLE_BAVARIA_VETERAN);
+    if (type === "veteran") {
+      rolesToAdd.push(ROLE_BAVARIA_VETERAN);
+      // Officers (Sergent+) are capped to Caporal-Fourrier on the sheet and had
+      // their officer rank role stripped by the sweep — assign the cpl-f role so
+      // Discord matches. (Genuine cpl-f veterans already hold it; re-add is a no-op.)
+      if (rank === "Caporal-Fourrier") rolesToAdd.push(RANK_ROLE_CAPORAL_FOURRIER);
+    }
     for (const roleId of rolesToAdd) {
       await targetMember.roles.add(roleId).catch((err) =>
         console.error(`Failed to add role ${roleId}:`, err.message)

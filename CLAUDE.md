@@ -73,9 +73,10 @@ Both blocks are followed by read-only stat/attendance columns (kills, activity %
 1. Block if the target is already on either reserve block.
 2. **Type + rank:** enlisted above Conscript (via `findUser`) → **veteran** path — keep current rank (officers in `PROTECTED_RANKS` are capped to `Caporal-Fourrier`), remove from company/department sheets, write to F/G/H locked. Conscripts (incl. Donauwörth trials) and anyone not enlisted → **mercenary** path — write to Z/AA/AB at `"Conscript"`.
 3. **Discord roles (built):** strip every role a member holds EXCEPT the keep-list, then add the reserve roles.
-   - Keep-list = `RESERVE_KEEP_ROLE_IDS` in `src/permissions.js` = `PROTECTED_ROLE_IDS` + the 6 enlisted rank roles (`ENLISTED_RANK_ROLE_IDS`, Conscript→Caporal-Fourrier). Managed roles (booster/integration) and `@everyone` are also skipped by the command loop.
-   - The sweep therefore removes the regiment, company, corps/army, Donauwörth, department, specialization, staff/command-access, and **officer-rank** roles in one pass.
+   - Keep-list = `RESERVE_KEEP_ROLE_IDS` in `src/permissions.js` = `PROTECTED_ROLE_IDS` + the 6 enlisted rank roles (`ENLISTED_RANK_ROLE_IDS`, Conscript→Caporal-Fourrier). Also skipped by the command loop: **earned honour roles** (`HONOUR_ROLE_IDS` from `src/honoursSheet.js` — every medal/nobility/veneration/grandbattle role, shared with `honours_sync` so the two never drift), managed roles (booster/integration), and `@everyone`.
+   - The sweep therefore removes the regiment, company, corps/army, Donauwörth, department, specialization, staff/command-access, and **officer-rank** roles in one pass — but never medals/honours.
    - Then add `ROLE_BAVARIAN_RESERVES` (`1193239194529714382`, the repurposed old-regiment "merc" role) to **everyone**, and `ROLE_BAVARIA_VETERAN` (`1530414516330827826`) additionally to **veterans**. Both hardcoded in `permissions.js` per the Railway pitfall.
+   - A veteran whose rank was capped to `Caporal-Fourrier` (a demoted officer — the sweep stripped their officer rank role) is (re)assigned the `RANK_ROLE_CAPORAL_FOURRIER` Discord role so Discord matches the locked sheet rank. Non-officer veterans keep their real rank role via the keep-list.
 4. Nickname keeps the `[2.] ` prefix — reserves stay tagged as regiment members.
 5. DMs the target the veteran or mercenary reserve welcome embed (`buildVeteranReserveEmbed` / `buildMercenaryReserveEmbed`, `.catch(() => null)` so closed DMs never block the command).
 

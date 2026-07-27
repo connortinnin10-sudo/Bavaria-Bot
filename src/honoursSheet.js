@@ -157,6 +157,17 @@ const MEDAL_ROLE_MAP = {
   },
 };
 
+// Every honour role the bot manages across all four families (nobility, veneration,
+// grandbattle, medals). Shared so callers that must recognize an "earned honour
+// role" stay in lockstep as medals are added: honours_sync's removal set and the
+// /user_reserve keep-list (reserve must never strip a member's earned medals/honours).
+const HONOUR_ROLE_IDS = new Set([
+  ...Object.values(NOBILITY_TIER_ROLES),
+  ...Object.values(VENERATION_RANK_ROLES),
+  ...Object.values(GRANDBATTLE_RANK_ROLES),
+  ...Object.values(MEDAL_ROLE_MAP).flatMap((tiers) => Object.values(tiers)),
+]);
+
 // Strip the "{Name}, " prefix some unique Titres de Victoire rows carry in
 // column I (e.g. "Orpios, Prince de Wagram") and return the exact title text
 // to use as-is for the nickname suffix.
@@ -267,4 +278,5 @@ module.exports = {
   VENERATION_RANK_ROLES,
   GRANDBATTLE_RANK_ROLES,
   MEDAL_ROLE_MAP,
+  HONOUR_ROLE_IDS,
 };
