@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const { transferCompany, getCompanyStaff } = require("../sheets");
 const { buildTransferEmbed, buildVeteranWelcomeBackEmbed } = require("../welcomeEmbed");
 const { sendCompanyWelcome } = require("../welcomeLog");
-const { COMPANY_ROLES, ROLE_DONAUWORTH, ROLE_REGIMENT, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN } = require("../permissions");
+const { COMPANY_ROLES, ROLE_DONAUWORTH, ROLE_REGIMENT, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN, ROLE_SPECIALIZATION } = require("../permissions");
 
 const RANK_ROLES = {
   "Conscript":          process.env.RANK_ROLE_CONSCRIPT,
@@ -87,6 +87,18 @@ module.exports = {
     if (NEW_ROLE) {
       await targetMember.roles.add(NEW_ROLE).catch((err) =>
         console.error("Failed to add new company role:", err.message)
+      );
+    }
+
+    // Grenadiers carry the shared Specialization role (same one Sappers/Drummers/
+    // Schützen get). Grant it when landing in Grenadier, strip it when leaving.
+    if (toCompany === "Grenadier") {
+      await targetMember.roles.add(ROLE_SPECIALIZATION).catch((err) =>
+        console.error("Failed to add specialization role:", err.message)
+      );
+    } else if (fromCompany === "Grenadier") {
+      await targetMember.roles.remove(ROLE_SPECIALIZATION).catch((err) =>
+        console.error("Failed to remove specialization role:", err.message)
       );
     }
 

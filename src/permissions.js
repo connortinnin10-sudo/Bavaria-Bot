@@ -91,13 +91,21 @@ const COMPANY_ROLES = {
 // when the member graduates to a company via /transfer_company.
 const ROLE_DONAUWORTH = "1193814402592407582";
 
+// Shared "Specialization" role carried by every specialist (Sapper, Drummer,
+// Schützen) and by Grenadiers. Granted alongside the per-position role(s) below
+// on /user_assign_specialization, and added on /transfer_company into Grenadier
+// (removed on transfer out). Hardcoded (not env) per the Railway pitfall.
+const ROLE_SPECIALIZATION = "1193815063480504370";
+
 // Discord roles granted on /user_assign_specialization and stripped on
 // /user_remove_specialization, keyed by position. Hardcoded (not env) for the
 // same Railway reason as COMPANY_ROLES. A position may grant more than one role.
+// Every position includes ROLE_SPECIALIZATION so the shared role is added/removed
+// automatically with the position.
 const SPECIALIZATION_ROLES = {
-  Sapper:     ["1361485325708562432", "1193815223891669102"], // Corps Sapper, Regiment Sapper
-  Drummer:    ["1382539832005365821"],                        // Drummer
-  "Schützen": ["1443331846401167533"],                        // Schützen
+  Sapper:     ["1361485325708562432", "1193815223891669102", ROLE_SPECIALIZATION], // Corps Sapper, Regiment Sapper
+  Drummer:    ["1382539832005365821", ROLE_SPECIALIZATION],                        // Drummer
+  "Schützen": ["1443331846401167533", ROLE_SPECIALIZATION],                        // Schützen
 };
 
 const ROLE_ETAT_MAJOR        = "1193239194571649045"; // full access to every command
@@ -156,6 +164,7 @@ module.exports = {
   COMPANY_ROLES,
   ROLE_DONAUWORTH,
   SPECIALIZATION_ROLES,
+  ROLE_SPECIALIZATION,
   ROLE_ETAT_MAJOR,
   ROLE_REGIMENT,
   ROLE_BAVARIAN_RESERVES,
