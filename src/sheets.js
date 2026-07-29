@@ -593,17 +593,60 @@ async function removeUser(userId) {
   return true;
 }
 
+// Which departments a member belongs to, matched by roster name (departments
+// store the name, not the Discord ID). Mirrors the name-matching in
+// removeFromAllDepartments. Returns display names in DEPARTMENTS order.
+async function getUserDepartments(username) {
+  const name = (username ?? "").toString().trim().toLowerCase();
+  if (!name) return [];
+
+  const tabNames = await getTabNames();
+  const deptTab  = tabNames[DEPT_GID];
+  if (!deptTab) return [];
+
+  const sheets = getSheetsClient();
+  const result = [];
+  for (const [deptName, dept] of Object.entries(DEPARTMENTS)) {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${deptTab.name}!${dept.fetchRange(dept.startRow, dept.endRow)}`,
+    });
+    const rows  = res.data.values ?? [];
+    const rowAt = (rowNumber) => rows[rowNumber - dept.startRow] ?? [];
+    const isMember = deptMemberRows(dept).some(
+      (rowNumber) => (rowAt(rowNumber)[dept.nameIdx] ?? "").toString().trim().toLowerCase() === name
+    );
+    if (isMember) result.push(deptName);
+  }
+  return result;
+}
+
 async function getStats(userId) {
   const found = await findUser(userId);
   if (!found) return null;
   const row = found.rowData;
+
+  const username = (row[COL.NAME.idx] ?? "Unknown").toString();
+  // Column J (idx 3) is the roster's LOA checkbox — flipped TRUE while the
+  // member is on an active leave (see applyAccountability / the midnight job).
+  const loaRaw   = row[3];
+  const loaActive = loaRaw === true || (loaRaw ?? "").toString().trim().toUpperCase() === "TRUE";
+
+  const [demerits, departments] = await Promise.all([
+    getDemeritCount(userId).catch(() => 0),
+    getUserDepartments(username).catch(() => []),
+  ]);
+
   return {
-    username:   (row[COL.NAME.idx]     ?? "Unknown").toString(),
+    username,
     company:    found.company,
     rank:       (row[COL.RANK.idx]     ?? "Unknown").toString(),
     kills:      (row[COL.KILLS.idx]    ?? "0").toString(),
     kpe:        (row[COL.KPE.idx]      ?? "0").toString(),
     activity:   (row[COL.ACTIVITY.idx] ?? "0%").toString(),
+    loaActive,
+    demerits,
+    departments,
   };
 }
 

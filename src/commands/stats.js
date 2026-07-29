@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { getStats } = require("../sheets");
+const { buildPersonalStatsEmbed } = require("../statsEmbed");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -17,15 +18,8 @@ module.exports = {
       });
     }
 
-    return interaction.editReply({
-      content: [
-        `📊 **Regiment Stats — ${stats.username}**`,
-        `> **Rank:** ${stats.rank}`,
-        `> **Company:** ${stats.company}`,
-        `> **KPE:** ${stats.kpe}`,
-        `> **Activity:** ${stats.activity}`,
-        `> **Total Kills:** ${stats.kills}`,
-      ].join("\n"),
-    });
+    const { embed, files } = buildPersonalStatsEmbed(stats);
+
+    return interaction.editReply({ embeds: [embed], files });
   },
 };
