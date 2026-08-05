@@ -46,14 +46,24 @@ function ladderProgress(rank) {
 }
 
 // /my_stats — the member's personal service record as an embed.
-function buildPersonalStatsEmbed(stats) {
+// `progress` (optional) is getPromotionProgress() from the promotion-points
+// system: when present it drives the bar with the real points percentage
+// (points ÷ this rank's threshold); otherwise we fall back to career-tier
+// ladder position (the pre-points placeholder, and for non-company members).
+function buildPersonalStatsEmbed(stats, progress = null) {
   const departments = (stats.departments ?? []).length
     ? stats.departments.join("\n")
     : "None";
 
   const loa = stats.loaActive ? "🟢 Active" : "⚪ Inactive";
 
-  const { percent, nextRank } = ladderProgress(stats.rank);
+  let percent, nextRank;
+  if (progress) {
+    percent  = progress.pct;
+    nextRank = progress.atCeiling ? null : progress.nextRank;
+  } else {
+    ({ percent, nextRank } = ladderProgress(stats.rank));
+  }
   const promotion = nextRank
     ? `**${stats.rank}**  →  ${nextRank}  •  **${percent}%**`
     : `**${stats.rank}**  •  Highest enlisted rank`;

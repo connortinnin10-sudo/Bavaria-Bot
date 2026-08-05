@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { getStats } = require("../sheets");
+const { getStats, getPromotionProgress } = require("../sheets");
 const { buildPersonalStatsEmbed } = require("../statsEmbed");
+const { POINTS_SYSTEM_ENABLED } = require("../permissions");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -18,7 +19,13 @@ module.exports = {
       });
     }
 
-    const { embed, files } = buildPersonalStatsEmbed(stats);
+    // Real promotion-points progress drives the bar when the system is on and the
+    // member has a profile; a read failure or no profile falls back to career-tier.
+    const progress = POINTS_SYSTEM_ENABLED
+      ? await getPromotionProgress(interaction.user.id).catch(() => null)
+      : null;
+
+    const { embed, files } = buildPersonalStatsEmbed(stats, progress);
 
     return interaction.editReply({ embeds: [embed], files });
   },
