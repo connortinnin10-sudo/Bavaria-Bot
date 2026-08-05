@@ -1,6 +1,7 @@
 const { google } = require("googleapis");
 const crypto = require("crypto");
 require("dotenv").config();
+const { nextRank, pointsForNextRank } = require("./permissions");
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 
@@ -1573,4 +1574,163 @@ async function clearExile(userId) {
   return true;
 }
 
-module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getSheetsClient };
+// ── Promotion points (Points tab) ──────────────────────────────────────────
+// The Points tab holds one row per company member: A=Username (display only),
+// B=Points, C=Discord ID (the match key, text-forced with a leading apostrophe),
+// D=Last updated (M/D), E=Status ("Ready" at threshold, else blank). Members are
+// matched by Discord ID ONLY — never by username. Profiles are created on
+// /transfer_company and reset to 0 on promotion / transfer / reserve.
+const POINTS_GID = 940892160;
+
+async function getPointsTabName() {
+  const tabNames = await getTabNames();
+  return tabNames[POINTS_GID]?.name ?? "Points";
+}
+
+// Month/day stamp for column D, e.g. "8/5".
+function todayMD() {
+  const d = new Date();
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+// Read a member's Points row by Discord ID (column C, idx 2). Null if they have
+// no profile (i.e. not a company member).
+async function getUserPoints(userId) {
+  const sheets = getSheetsClient();
+  const tab    = await getPointsTabName();
+  const res    = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${tab}!A:E` });
+  const rows   = res.data.values ?? [];
+  for (let i = 0; i < rows.length; i++) {
+    if ((rows[i][2] ?? "").toString().trim() !== userId.toString()) continue;
+    return {
+      rowNumber: i + 1,
+      username:  (rows[i][0] ?? "").toString(),
+      points:    parseInt((rows[i][1] ?? "0").toString(), 10) || 0,
+      ready:     (rows[i][4] ?? "").toString().trim().toLowerCase() === "ready",
+    };
+  }
+  return null;
+}
+
+// Create a fresh 0-point profile iff the Discord ID isn't already present.
+// Called when a member enters a company via /transfer_company.
+async function ensureProfile(userId, username) {
+  const existing = await getUserPoints(userId);
+  if (existing) return existing;
+  const sheets = getSheetsClient();
+  const tab    = await getPointsTabName();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: `${tab}!A:E`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[username ?? "", 0, "'" + userId, todayMD(), ""]] },
+  });
+  return { rowNumber: null, username: username ?? "", points: 0, ready: false };
+}
+
+// Recompute + write the Ready flag (col E) from the member's points vs their
+// rank's threshold (rank read live from the roster). Returns the boolean.
+async function refreshReadyFlag(userId, rowNumber, points) {
+  const sheets = getSheetsClient();
+  const tab    = await getPointsTabName();
+  const found  = await findUser(userId);
+  const rank   = found ? (found.rowData[COL.RANK.idx] ?? "").toString().trim() : "";
+  const needed = pointsForNextRank(rank);
+  const ready  = needed != null && points >= needed;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${tab}!E${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[ready ? "Ready" : ""]] },
+  });
+  return ready;
+}
+
+// Add (delta>0) or subtract (delta<0) points for a member, floored at 0. Stamps
+// col D and recomputes the Ready flag. Returns the new state, or null if the
+// member has no profile.
+async function addPoints(userId, delta) {
+  const current = await getUserPoints(userId);
+  if (!current) return null;
+  const newPoints = Math.max(0, current.points + delta);
+  const sheets = getSheetsClient();
+  const tab    = await getPointsTabName();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${tab}!B${current.rowNumber}:D${current.rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[newPoints, "'" + userId, todayMD()]] },
+  });
+  const ready = await refreshReadyFlag(userId, current.rowNumber, newPoints);
+  return { rowNumber: current.rowNumber, username: current.username, points: newPoints, ready };
+}
+
+// Reset a member's points to 0 and clear their Ready flag (on promotion,
+// transfer, or reserve). Returns false if they have no profile.
+async function resetPoints(userId) {
+  const current = await getUserPoints(userId);
+  if (!current) return false;
+  const sheets = getSheetsClient();
+  const tab    = await getPointsTabName();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${tab}!B${current.rowNumber}:E${current.rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[0, "'" + userId, todayMD(), ""]] },
+  });
+  return true;
+}
+
+// Progress toward the member's next rank, for /my_stats. Points from the Points
+// tab (by Discord ID); current rank from the roster (findUser). Null if no profile.
+async function getPromotionProgress(userId) {
+  const pts = await getUserPoints(userId);
+  if (!pts) return null;
+  const found       = await findUser(userId);
+  const currentRank = found ? (found.rowData[COL.RANK.idx] ?? "").toString().trim() : "";
+  const needed      = pointsForNextRank(currentRank);
+  const next        = nextRank(currentRank);
+  const atCeiling   = needed == null || next == null;
+  const pct         = atCeiling ? 100 : Math.min(100, Math.round((pts.points / needed) * 100));
+  return {
+    currentRank,
+    nextRank: next,
+    points:   pts.points,
+    needed,
+    pct,
+    approved: !atCeiling && pts.points >= needed,
+    atCeiling,
+  };
+}
+
+// Every member currently flagged Ready, joined with their live rank + company
+// from the roster, grouped by the three line companies (for /current_promotions).
+// Members not on a line-company roster, or with no next rank, are skipped.
+async function getReadyMembers() {
+  const sheets = getSheetsClient();
+  const tab    = await getPointsTabName();
+  const res    = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${tab}!A:E` });
+  const rows   = res.data.values ?? [];
+
+  const groups = { Bayreuth: [], Rosenheim: [], Grenadier: [] };
+  for (let i = 0; i < rows.length; i++) {
+    if ((rows[i][4] ?? "").toString().trim().toLowerCase() !== "ready") continue;
+    const userId = (rows[i][2] ?? "").toString().trim();
+    if (!userId) continue;
+    const found = await findUser(userId);
+    if (!found || !groups[found.company]) continue;
+    const rank = (found.rowData[COL.RANK.idx] ?? "").toString().trim();
+    const next = nextRank(rank);
+    if (!next) continue;
+    groups[found.company].push({
+      userId,
+      username:    (rows[i][0] ?? found.rowData[COL.NAME.idx] ?? "").toString(),
+      rowNumber:   i + 1,
+      currentRank: rank,
+      nextRank:    next,
+    });
+  }
+  return groups;
+}
+
+module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, getPromotionProgress, getReadyMembers, getSheetsClient };
