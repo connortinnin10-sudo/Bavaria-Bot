@@ -12,6 +12,8 @@ const commands = [
   require("./commands/addFlagDepartment").data.toJSON(),
   require("./commands/departmentRemove").data.toJSON(),
   require("./commands/userRankChange").data.toJSON(),
+  require("./commands/userAddPoint").data.toJSON(),
+  require("./commands/userRemovePoint").data.toJSON(),
   require("./commands/userReserve").data.toJSON(),
   require("./commands/transferCompany").data.toJSON(),
   require("./commands/userAssignSpecialization").data.toJSON(),

@@ -28,6 +28,8 @@ const commands = [
   require("./src/commands/addFlagDepartment"),
   require("./src/commands/departmentRemove"),
   require("./src/commands/userRankChange"),
+  require("./src/commands/userAddPoint"),
+  require("./src/commands/userRemovePoint"),
   require("./src/commands/userReserve"),
   require("./src/commands/transferCompany"),
   require("./src/commands/userAssignSpecialization"),
@@ -65,7 +67,9 @@ const TRIAL_RESTRICTED = new Set([
 ]);
 
 // Read-only / self-service commands that don't need a command-log entry.
-const COMMAND_LOG_EXEMPT = new Set(["my_stats", "honours_sync"]);
+// user_add_point / user_remove_point do their own rich logging (officer + amount
+// + every recipient), so they're exempt from the single-target central logger.
+const COMMAND_LOG_EXEMPT = new Set(["my_stats", "honours_sync", "user_add_point", "user_remove_point"]);
 
 for (const command of commands) {
   client.commands.set(command.data.name, command);
