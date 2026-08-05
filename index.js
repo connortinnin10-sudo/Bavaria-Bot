@@ -30,6 +30,7 @@ const commands = [
   require("./src/commands/userRankChange"),
   require("./src/commands/userAddPoint"),
   require("./src/commands/userRemovePoint"),
+  require("./src/commands/currentPromotions"),
   require("./src/commands/userReserve"),
   require("./src/commands/transferCompany"),
   require("./src/commands/userAssignSpecialization"),
@@ -69,7 +70,7 @@ const TRIAL_RESTRICTED = new Set([
 // Read-only / self-service commands that don't need a command-log entry.
 // user_add_point / user_remove_point do their own rich logging (officer + amount
 // + every recipient), so they're exempt from the single-target central logger.
-const COMMAND_LOG_EXEMPT = new Set(["my_stats", "honours_sync", "user_add_point", "user_remove_point"]);
+const COMMAND_LOG_EXEMPT = new Set(["my_stats", "honours_sync", "user_add_point", "user_remove_point", "current_promotions"]);
 
 for (const command of commands) {
   client.commands.set(command.data.name, command);
@@ -155,6 +156,16 @@ client.once("ready", async () => {
 const handledInteractions = new Set();
 
 client.on("interactionCreate", async (interaction) => {
+  // Button interactions — route the promotion-panel buttons to their handler.
+  if (interaction.isButton()) {
+    if (interaction.customId === "promo_approve" || interaction.customId === "promo_close") {
+      const panel = client.commands.get("current_promotions");
+      try { await panel.handleButton(interaction); }
+      catch (err) { console.error("[button] promo handler error:", err.message); }
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   // Deduplicate replayed interactions (gateway resume can replay the same ID)
