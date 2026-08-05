@@ -61,6 +61,9 @@ module.exports = {
       if (err.message === "MERCENARY_RESERVE") {
         return interaction.editReply({ content: `**${targetUser.username}** is a mercenary on reserve — enlist them with \`/user_enlist\` (they start at Conscript in Donauwörth).` });
       }
+      if (err.message === "FLAG_SECTION_FULL") {
+        return interaction.editReply({ content: `❌ **${targetUser.username}** is apart of the flag department, there are no open spaces in **${destination}**. Contact the flag department staff.` });
+      }
       throw err;
     }
 
@@ -70,7 +73,7 @@ module.exports = {
       });
     }
 
-    const { source, fromCompany, toCompany, username, rank } = result;
+    const { source, fromCompany, toCompany, username, rank, flagMoved } = result;
     const isDonauworth   = source === "donauworth";
     const isVeteranReturn = source === "veteran-reserve";
 
@@ -165,8 +168,10 @@ module.exports = {
         ? "\n> Returned from the veteran reserve at their retained rank."
         : "\n> Attendance history carried over. Kills, KPE, and activity% will recalculate automatically.";
 
+    const flagNote = flagMoved ? `\n> Flag Department slot moved to the **${toCompany}** section.` : "";
+
     return interaction.editReply({
-      content: `✅ **${username || targetUser.username}** has been transferred from **${fromCompany}** to **${toCompany}**.\n> **Rank:** ${rank || "Unknown"}${note}`,
+      content: `✅ **${username || targetUser.username}** has been transferred from **${fromCompany}** to **${toCompany}**.\n> **Rank:** ${rank || "Unknown"}${note}${flagNote}`,
     });
   },
 };

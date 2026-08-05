@@ -6,7 +6,15 @@ const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 
 const ENLIST_READ_START  = 15; // read from row 15 (includes all command/officer rows)
 const ENLIST_START_ROW   = 23; // write only from row 23
-const ENLIST_END_ROW     = 68;
+const ENLIST_END_ROW     = 68; // default roster end row
+
+// Per-company roster end-row overrides. Bayreuth's placement area was expanded to
+// row 170 (same layout, just more rows); the other companies still end at 68.
+// Add a company here to grow its roster — no other change needed.
+const ENLIST_END_ROW_OVERRIDES = { Bayreuth: 170 };
+function enlistEndRow(company) {
+  return ENLIST_END_ROW_OVERRIDES[company] ?? ENLIST_END_ROW;
+}
 
 // Per-member roster row layout: G:K are real data (rank, timezone, name, LOA,
 // discord ID). L=Kills and M=KPE are looked up off the Name (I); N=Activity% is
@@ -109,7 +117,7 @@ const DEPARTMENTS = {
     fetchRange: (s, e) => `H${s}:I${e}`,
   },
   "Flag Department": {
-    startRow: 18, endRow: 40,
+    startRow: 18, endRow: 48,
     positionCol: "K", rankCol: "L", nameCol: "M",
     rankIdx: 0,       nameIdx: 1,
     fetchRange: (s, e) => `L${s}:M${e}`,
@@ -118,12 +126,14 @@ const DEPARTMENTS = {
 };
 
 // Flag members sit in per-company sections rather than one flat list. The
-// Kommandant rows (16/17/25/33) hold permanent slot labels in column K and fall
-// outside every section — the bot must never write to or clear them.
+// Kommandant rows (16 Department, 17/18 Bayreuth, 33 Volts, 41 München) hold
+// permanent slot labels in column K and fall outside every section — the bot must
+// never write to or clear them. The middle section is labelled "Volts" on the
+// sheet but keyed by the company system's name "Rosenheim".
 const FLAG_SECTIONS = {
-  Rosenheim: { startRow: 18, endRow: 22 },
-  Bayreuth:  { startRow: 26, endRow: 32 },
-  Grenadier: { startRow: 34, endRow: 40 }, // München section
+  Bayreuth:  { startRow: 19, endRow: 32 },
+  Rosenheim: { startRow: 34, endRow: 40 }, // "Volts" section on the sheet
+  Grenadier: { startRow: 42, endRow: 48 }, // München section
 };
 
 // Row numbers the bot manages for a department: the flat startRow..endRow range,
@@ -208,11 +218,11 @@ function parseUsername(rawNickname) {
   return name.trim();
 }
 
-async function fetchEnlistRows(tabName, startRow = ENLIST_READ_START) {
+async function fetchEnlistRows(tabName, startRow = ENLIST_READ_START, endRow = ENLIST_END_ROW) {
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: `${tabName}!G${startRow}:N${ENLIST_END_ROW}`,
+    range: `${tabName}!G${startRow}:N${endRow}`,
   });
   return res.data.values ?? [];
 }
@@ -263,7 +273,7 @@ async function findUser(userId) {
   for (const [company, gid] of Object.entries(COMPANY_GID)) {
     const info = tabNames[gid];
     if (!info) continue;
-    const rows = await fetchEnlistRows(info.name, ENLIST_READ_START);
+    const rows = await fetchEnlistRows(info.name, ENLIST_READ_START, enlistEndRow(company));
     for (let i = 0; i < rows.length; i++) {
       const discordId = (rows[i][COL.DISCORD.idx] ?? "").toString().trim();
       if (discordId === userId) {
@@ -304,14 +314,15 @@ async function enlistUser({ userId, username, company, timezone, rank }) {
   const info     = tabNames[gid];
   if (!info) throw new Error(`No tab found for company: ${company}`);
 
-  const rows = await fetchEnlistRows(info.name, ENLIST_START_ROW);
+  const endRow = enlistEndRow(company);
+  const rows = await fetchEnlistRows(info.name, ENLIST_START_ROW, endRow);
 
   // Loop over the full declared range, not rows.length — the Sheets API omits
   // trailing rows entirely when they're fully blank, so if the only open slot
   // is at the tail end, rows.length comes back short and a rows.length-bounded
   // loop would never reach it, wrongly reporting NO_SPACE.
   let targetRowNumber = null;
-  for (let i = 0; i < (ENLIST_END_ROW - ENLIST_START_ROW + 1); i++) {
+  for (let i = 0; i < (endRow - ENLIST_START_ROW + 1); i++) {
     if (isEnlistRowAvailable(rows[i] ?? [])) {
       targetRowNumber = ENLIST_START_ROW + i;
       break;
@@ -381,9 +392,10 @@ async function returnVeteranToCompany(userId, company, timezone, reserve) {
   const rank     = (reserve.rowData[2] ?? "").toString().trim() || "Soldat";
   const username = (reserve.rowData[1] ?? "").toString().trim();
 
-  const rows = await fetchEnlistRows(info.name, ENLIST_START_ROW);
+  const endRow = enlistEndRow(company);
+  const rows = await fetchEnlistRows(info.name, ENLIST_START_ROW, endRow);
   let targetRowNumber = null;
-  for (let i = 0; i < (ENLIST_END_ROW - ENLIST_START_ROW + 1); i++) {
+  for (let i = 0; i < (endRow - ENLIST_START_ROW + 1); i++) {
     if (isEnlistRowAvailable(rows[i] ?? [])) { targetRowNumber = ENLIST_START_ROW + i; break; }
   }
   if (targetRowNumber === null) throw new Error("NO_SPACE");
@@ -480,15 +492,24 @@ async function transferCompany(userId, destinationCompany, timezone) {
   // Loop over the full declared range, not targetRows.length — see the same
   // comment in enlistUser for why a rows.length-bounded loop misses a trailing
   // open slot when the Sheets API drops fully-blank trailing rows.
-  const targetRows = await fetchEnlistRows(targetInfo.name, ENLIST_START_ROW);
+  const targetEndRow = enlistEndRow(targetCompany);
+  const targetRows = await fetchEnlistRows(targetInfo.name, ENLIST_START_ROW, targetEndRow);
   let targetRowNumber = null;
-  for (let i = 0; i < (ENLIST_END_ROW - ENLIST_START_ROW + 1); i++) {
+  for (let i = 0; i < (targetEndRow - ENLIST_START_ROW + 1); i++) {
     if (isEnlistRowAvailable(targetRows[i] ?? [])) {
       targetRowNumber = ENLIST_START_ROW + i;
       break;
     }
   }
   if (targetRowNumber === null) throw new Error("NO_SPACE");
+
+  // If the member holds a Flag Department slot, move it to the destination company's
+  // flag section BEFORE writing the roster — so a full flag section (FLAG_SECTION_FULL)
+  // aborts the whole transfer cleanly, with no roster rows written yet.
+  const flagMove = await moveFlagDepartmentToCompany(
+    (paddedCore[COL.NAME.idx] ?? "").toString().trim(),
+    targetCompany,
+  );
 
   await writeRow(targetInfo.name, ROSTER_CORE_START_COL, ROSTER_CORE_END_COL, targetRowNumber, paddedCore);
   await writeRow(targetInfo.name, ROSTER_ATTENDANCE_START_COL, ROSTER_ATTENDANCE_END_COL, targetRowNumber, paddedAttendance);
@@ -536,6 +557,7 @@ async function transferCompany(userId, destinationCompany, timezone) {
     toCompany:   targetCompany,
     rank:        (paddedCore[COL.RANK.idx] ?? "").toString().trim(),
     username:    (paddedCore[COL.NAME.idx] ?? "").toString().trim(),
+    flagMoved:   flagMove.moved,
   };
 }
 
@@ -550,7 +572,7 @@ async function getCompanyStaff(company) {
   const sheets = getSheetsClient();
   const [staffRes, rosterRows] = await Promise.all([
     sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${info.name}!${STAFF_RANGE}` }),
-    fetchEnlistRows(info.name, ENLIST_READ_START),
+    fetchEnlistRows(info.name, ENLIST_READ_START, enlistEndRow(company)),
   ]);
   const staffRows = staffRes.data.values ?? [];
 
@@ -720,6 +742,64 @@ async function addToFlagDepartment({ company, position, rank, username }) {
 
   await writeRow(deptTab.name, dept.positionCol, dept.nameCol, targetRowNumber, [position, rank, username]);
   return { rowNumber: targetRowNumber };
+}
+
+// Move a member's Flag Department slot from their current company section into the
+// destination company's section. Used by transferCompany so a flagger's flag
+// profile follows them when they change companies.
+//   - Returns { moved: false } if they hold no flag slot (nothing to do), or if the
+//     destination company has no flag section.
+//   - Throws FLAG_SECTION_FULL if the destination section has no open slot, letting
+//     the caller abort the transfer before any roster rows are written.
+// Carries over the same [position, rank, name] the member already held.
+async function moveFlagDepartmentToCompany(username, toCompany) {
+  const name = (username ?? "").toString().trim();
+  if (!name) return { moved: false };
+
+  const tabNames = await getTabNames();
+  const deptTab  = tabNames[DEPT_GID];
+  if (!deptTab) return { moved: false };
+
+  const section = FLAG_SECTIONS[toCompany];
+  if (!section) return { moved: false };
+
+  const dept   = DEPARTMENTS["Flag Department"];
+  const sheets = getSheetsClient();
+
+  // Read the whole flag block once as K:M (position, rank, name), indexed by row
+  // number so Kommandant rows sitting inside the span are simply never considered.
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${deptTab.name}!${dept.positionCol}${dept.startRow}:${dept.nameCol}${dept.endRow}`,
+  });
+  const rows   = res.data.values ?? [];
+  const rowAt  = (rowNumber) => rows[rowNumber - dept.startRow] ?? [];
+  const NAME_I = 2; // name is the 3rd column in the K:M read
+
+  // Find their current flag row anywhere in the managed member rows.
+  let sourceRow = null;
+  for (const rowNumber of deptMemberRows(dept)) {
+    const rowName = (rowAt(rowNumber)[NAME_I] ?? "").toString().trim().toLowerCase();
+    if (rowName === name.toLowerCase()) { sourceRow = rowNumber; break; }
+  }
+  if (sourceRow === null) return { moved: false }; // not in the Flag Department
+
+  // Preserve their exact [position, rank, name], then find an open destination slot.
+  const carried = [0, 1, 2].map((i) => (rowAt(sourceRow)[i] ?? "").toString());
+
+  let destRow = null;
+  for (let r = section.startRow; r <= section.endRow; r++) {
+    // A K:M row is available when its position + rank cells are both empty.
+    if (isDeptRowAvailable(rowAt(r))) { destRow = r; break; }
+  }
+  if (destRow === null) throw new Error("FLAG_SECTION_FULL");
+
+  await writeRow(deptTab.name, dept.positionCol, dept.nameCol, destRow, carried);
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: SHEET_ID,
+    range: `${deptTab.name}!${deptClearRange(dept, sourceRow)}`,
+  });
+  return { moved: true, position: carried[0] };
 }
 
 // Remove a user from ALL departments by name (used during regiment removal)
