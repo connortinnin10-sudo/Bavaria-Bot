@@ -86,6 +86,41 @@ function rankAtLeast(rank, minRank) {
   return r !== -1 && m !== -1 && r >= m;
 }
 
+// ── Promotion points system ────────────────────────────────────────────────
+
+// Master on/off switch for the whole promotion-points feature. Hardcoded (not an
+// env var) per the Railway pitfall — flip to false + push to disable every entry
+// point (point commands, transfer/reserve hooks, /current_promotions, the
+// /my_stats bar) without removing code. Points data on the sheet is left intact.
+const POINTS_SYSTEM_ENABLED = true;
+
+// Points needed to promote FROM each rank to the next; points reset to 0 on
+// promotion. Keyed by current rank. Only the enlisted ranks Soldat..Caporal de
+// Premier have a threshold — Caporal-Fourrier is the top of the points ladder
+// (promotions beyond it, into officer ranks, stay manual/discretionary).
+const PROMOTION_THRESHOLDS = {
+  "Soldat":             10, // → Soldat de Premier
+  "Soldat de Premier":  20, // → Caporal
+  "Caporal":            30, // → Caporal de Premier
+  "Caporal de Premier": 50, // → Caporal-Fourrier
+};
+
+// Caporal-Fourrier is index 5 in RANK_ORDER — the ceiling for points-based
+// promotion. nextRank returns null at/above it (or for an unknown rank), so the
+// points system never promotes into the officer ranks (Sergent+).
+const CAPORAL_FOURRIER_INDEX = 5;
+function nextRank(rank) {
+  const i = RANK_ORDER.indexOf((rank ?? "").toString().trim());
+  if (i === -1 || i >= CAPORAL_FOURRIER_INDEX) return null;
+  return RANK_ORDER[i + 1];
+}
+
+// Points required to promote from `rank`, or null when the rank has no threshold
+// (Caporal-Fourrier and above, or an unrecognised rank) — i.e. the ladder ceiling.
+function pointsForNextRank(rank) {
+  return PROMOTION_THRESHOLDS[(rank ?? "").toString().trim()] ?? null;
+}
+
 // Hardcoded (not read from process.env) — Railway has silently dropped env vars
 // before, which is why DEPT_ROLES and PROTECTED_ROLE_IDS were already moved here.
 const COMPANY_ROLES = {
@@ -138,6 +173,9 @@ const COMMAND_PERMISSIONS = {
   user_reserve:        [ROLE_PETIT_ETAT_MAJOR],
   transfer_company:    [ROLE_PETIT_ETAT_MAJOR],
   user_rank_change:    [ROLE_PETIT_ETAT_MAJOR],
+  user_add_point:      [ROLE_PETIT_ETAT_MAJOR],
+  user_remove_point:   [ROLE_PETIT_ETAT_MAJOR],
+  current_promotions:  [ROLE_PETIT_ETAT_MAJOR],
   user_loa:            [ROLE_PETIT_ETAT_MAJOR],
   user_loa_remove:     [ROLE_PETIT_ETAT_MAJOR],
   demerit_add:         [ROLE_PETIT_ETAT_MAJOR],
@@ -168,6 +206,10 @@ module.exports = {
   PROTECTED_RANKS,
   RANK_ORDER,
   rankAtLeast,
+  POINTS_SYSTEM_ENABLED,
+  PROMOTION_THRESHOLDS,
+  nextRank,
+  pointsForNextRank,
   COMPANY_ROLES,
   ROLE_DONAUWORTH,
   SPECIALIZATION_ROLES,
