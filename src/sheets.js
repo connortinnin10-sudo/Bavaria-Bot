@@ -52,7 +52,7 @@ const COMPANY_GID = {
 // induction, transfer status) are dropdowns the bot never writes to.
 const DONAUWORTH_GID       = 1702557097;
 const DONAUWORTH_START_ROW = 27;
-const DONAUWORTH_END_ROW   = 56;
+const DONAUWORTH_END_ROW   = 90;
 
 const DONAUWORTH_COL = {
   RANK:     { letter: "G", idx: 0 },
