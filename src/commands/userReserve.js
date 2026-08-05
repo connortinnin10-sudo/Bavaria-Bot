@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { findUser, removeUser, removeFromAllDepartments, findReserveUser, reserveUser, parseUsername } = require("../sheets");
-const { PROTECTED_RANKS, RESERVE_KEEP_ROLE_IDS, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN, RANK_ROLE_CAPORAL_FOURRIER, RESERVE_EXTRA_ROLE_IDS } = require("../permissions");
+const { findUser, removeUser, removeFromAllDepartments, findReserveUser, reserveUser, parseUsername, resetPoints } = require("../sheets");
+const { PROTECTED_RANKS, RESERVE_KEEP_ROLE_IDS, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN, RANK_ROLE_CAPORAL_FOURRIER, RESERVE_EXTRA_ROLE_IDS, POINTS_SYSTEM_ENABLED } = require("../permissions");
 const { buildVeteranReserveEmbed, buildMercenaryReserveEmbed } = require("../welcomeEmbed");
 const { HONOUR_ROLE_IDS } = require("../honoursSheet");
 
@@ -61,6 +61,14 @@ module.exports = {
         return interaction.editReply({ content: "❌ The reserve roster is full. No available slots." });
       }
       throw err;
+    }
+
+    // Promotion-points: going to reserve wipes their points to 0 (and clears the
+    // Ready flag). No-op if they had no profile. Guarded by the kill switch.
+    if (POINTS_SYSTEM_ENABLED) {
+      await resetPoints(targetUser.id).catch((err) =>
+        console.error("[points] reserve hook failed:", err.message)
+      );
     }
 
     // Strip every role EXCEPT the reserve keep-list (protected roles + enlisted

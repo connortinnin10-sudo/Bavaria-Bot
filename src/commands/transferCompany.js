@@ -1,8 +1,8 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { transferCompany, getCompanyStaff } = require("../sheets");
+const { transferCompany, getCompanyStaff, ensureProfile, resetPoints } = require("../sheets");
 const { buildTransferEmbed, buildVeteranWelcomeBackEmbed } = require("../welcomeEmbed");
 const { sendCompanyWelcome } = require("../welcomeLog");
-const { COMPANY_ROLES, ROLE_DONAUWORTH, ROLE_REGIMENT, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN, ROLE_SPECIALIZATION, RESERVE_EXTRA_ROLE_IDS } = require("../permissions");
+const { COMPANY_ROLES, ROLE_DONAUWORTH, ROLE_REGIMENT, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN, ROLE_SPECIALIZATION, RESERVE_EXTRA_ROLE_IDS, POINTS_SYSTEM_ENABLED } = require("../permissions");
 
 const RANK_ROLES = {
   "Conscript":          process.env.RANK_ROLE_CONSCRIPT,
@@ -148,6 +148,18 @@ module.exports = {
       await targetMember.setNickname(`[2.] ${username}`).catch((err) =>
         console.error("Failed to set nickname:", err.message)
       );
+    }
+
+    // Promotion-points: landing in a company makes them an official member — ensure
+    // a Points profile exists and reset it to 0 (a fresh start on every transfer).
+    // Guarded by the kill switch; never blocks the transfer if the sheet write fails.
+    if (POINTS_SYSTEM_ENABLED) {
+      try {
+        await ensureProfile(targetUser.id, username);
+        await resetPoints(targetUser.id);
+      } catch (err) {
+        console.error("[points] transfer hook failed:", err.message);
+      }
     }
 
     // DM the member. Returning veterans get the "welcome back" embed; everyone else
