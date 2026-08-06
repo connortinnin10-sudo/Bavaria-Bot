@@ -161,6 +161,15 @@ function deptClearRange(dept, rowNumber) {
 }
 
 let tabNameCache = null;
+let tabNameCacheAt = 0;
+// Tab titles can be renamed on the sheet while the bot keeps running (e.g. the
+// Rosenheim company tab was renamed to "Voltigeur-Kompanie"). GIDs are stable but
+// titles are what we build A1 ranges from, so an indefinite cache would keep
+// pointing every range at the old, now-nonexistent title and fail with
+// "Unable to parse range" until a manual restart. A short TTL lets a rename
+// self-heal within a few minutes. (Setting tabNameCache = null still forces an
+// immediate refresh where a caller just created a tab.)
+const TAB_NAME_TTL_MS = 5 * 60 * 1000;
 let _auth        = null;
 
 // Railway sometimes strips newlines from env vars, leaving the PEM as one long line.
@@ -194,7 +203,7 @@ function getSheetsClient() {
 }
 
 async function getTabNames() {
-  if (tabNameCache) return tabNameCache;
+  if (tabNameCache && Date.now() - tabNameCacheAt < TAB_NAME_TTL_MS) return tabNameCache;
   const sheets = getSheetsClient();
   const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
   const cache = {};
@@ -205,6 +214,7 @@ async function getTabNames() {
     };
   }
   tabNameCache = cache;
+  tabNameCacheAt = Date.now();
   return cache;
 }
 
