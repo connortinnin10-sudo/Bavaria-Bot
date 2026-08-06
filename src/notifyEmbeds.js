@@ -150,7 +150,37 @@ function buildDepartmentRemovedEmbed({ department, officerId }) {
   return buildEmbed(BAVARIAN_BLUE, "Removed from Department", description);
 }
 
+// /user_add_point — DM to a member who was awarded promotion points.
+function buildPointsAwardedEmbed({ amount, total }) {
+  const description = [
+    `📈 You've received **+${amount}** promotion point${amount === 1 ? "" : "s"}` +
+      (total != null ? ` — you're now at **${total}**.` : "."),
+    "Check your progress with `/my_stats`.",
+  ].join("\n");
+
+  return buildEmbed(BAVARIAN_BLUE, "Points Received", description);
+}
+
+// /current_promotions — DM to a member who was promoted.
+function buildPromotionEmbed({ username, rank, nextThreshold }) {
+  const nextLine = nextThreshold != null
+    ? `Your points have been reset — you'll need **${nextThreshold}** points to reach your next promotion.`
+    : "You've reached the **highest enlisted rank** — further promotions are at officer discretion.";
+
+  const description = [
+    `🎖️ Congratulations, **${username}** — you've been promoted to **${rank}**!`,
+    nextLine,
+    "",
+    "If you're looking to progress faster, it's encouraged you join a platoon or a department. " +
+      "The more effort you put into this regiment, the quicker you'll receive the results!",
+  ].join("\n");
+
+  return buildEmbed(SUCCESS_GREEN, "Promotion", description);
+}
+
 module.exports = {
+  buildPointsAwardedEmbed,
+  buildPromotionEmbed,
   buildDemeritAddEmbed,
   buildDemeritRemoveEmbed,
   buildDemeritResetEmbed,

@@ -1,7 +1,8 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require("discord.js");
 const { getReadyMembers, promoteUser, resetPoints } = require("../sheets");
-const { POINTS_SYSTEM_ENABLED, hasAnyRole, ROLE_ETAT_MAJOR, COMMAND_PERMISSIONS } = require("../permissions");
+const { POINTS_SYSTEM_ENABLED, hasAnyRole, ROLE_ETAT_MAJOR, COMMAND_PERMISSIONS, pointsForNextRank } = require("../permissions");
 const { logCommand } = require("../commandLog");
+const { buildPromotionEmbed } = require("../notifyEmbeds");
 
 const BAVARIAN_BLUE = 0x1E5AA8;
 const CREST_PATH    = "./assets/regiment-crest.png";
@@ -137,6 +138,18 @@ module.exports = {
       );
 
     await interaction.editReply({ embeds: [resultEmbed], components: [], attachments: [] }).catch(() => null);
+
+    // DM each promoted member (closed DMs ignored).
+    for (const m of promoted) {
+      const { embed, files } = buildPromotionEmbed({
+        username: m.username,
+        rank: m.nextRank,
+        nextThreshold: pointsForNextRank(m.nextRank),
+      });
+      await interaction.client.users.fetch(m.userId)
+        .then((user) => user.send({ embeds: [embed], files }))
+        .catch(() => null);
+    }
 
     await logCommand({
       commandName: "current_promotions",

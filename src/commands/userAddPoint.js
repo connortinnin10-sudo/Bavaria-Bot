@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require("discord.js");
 const { awardPoints } = require("../sheets");
 const { POINTS_SYSTEM_ENABLED } = require("../permissions");
 const { logCommand } = require("../commandLog");
+const { buildPointsAwardedEmbed } = require("../notifyEmbeds");
 
 // Discord snowflake IDs are 17-20 digits; pull every id out of the `users`
 // string whether it was a mention (<@123> / <@!123>) or a bare id.
@@ -55,6 +56,14 @@ module.exports = {
     }
     if (!updated.length && !notInCompany.length) {
       lines.push("Nothing to do.");
+    }
+
+    // DM each awarded member (closed DMs are ignored).
+    for (const u of updated) {
+      const { embed, files } = buildPointsAwardedEmbed({ amount, total: u.points });
+      await interaction.client.users.fetch(u.id)
+        .then((user) => user.send({ embeds: [embed], files }))
+        .catch(() => null);
     }
 
     // Rich audit log: officer, amount, and every member it was applied to.
