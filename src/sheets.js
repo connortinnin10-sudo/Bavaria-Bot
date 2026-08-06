@@ -926,6 +926,46 @@ async function promoteUser(userId, newRank) {
     }
   }
 
+  // 3. Update rank in any specialization slots (Sapper/Drummer) on the member's
+  //    company sheet — these store [rank, name] and go stale otherwise.
+  const specBlocks = SPECIALIZATION_BLOCKS[found.company];
+  if (specBlocks) {
+    for (const [, block] of Object.entries(specBlocks)) {
+      const byRow = await readSpecializationBlock(found.tabName, block);
+      for (const [rowNumber, { name }] of byRow) {
+        if (name && name.toLowerCase() === storedUsername.toLowerCase()) {
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: SHEET_ID,
+            range: `${found.tabName}!${block.rankCol}${rowNumber}`,
+            valueInputOption: "USER_ENTERED",
+            requestBody: { values: [[newRank]] },
+          });
+        }
+      }
+    }
+  }
+
+  // 4. Update rank in the company staff block (Kompaniestab, C=rank/D=name), if
+  //    the member is listed there. Only the line-company sheets carry this block.
+  if (COMPANY_GID[found.company]) {
+    const staffRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${found.tabName}!${STAFF_RANGE}`,
+    });
+    const staffRows = staffRes.data.values ?? [];
+    for (let i = 0; i < staffRows.length; i++) {
+      const name = (staffRows[i][1] ?? "").toString().trim().toLowerCase();
+      if (name && name === storedUsername.toLowerCase()) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SHEET_ID,
+          range: `${found.tabName}!C${STAFF_ROWS[i].row}`,
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: [[newRank]] },
+        });
+      }
+    }
+  }
+
   return true;
 }
 
