@@ -1717,26 +1717,48 @@ async function getPromotionProgress(userId) {
 // from the roster, grouped by the three line companies (for /current_promotions).
 // Members not on a line-company roster, or with no next rank, are skipped.
 async function getReadyMembers() {
-  const sheets = getSheetsClient();
-  const tab    = await getPointsTabName();
-  const res    = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${tab}!A:E` });
-  const rows   = res.data.values ?? [];
+  const sheets    = getSheetsClient();
+  const tabNames  = await getTabNames();
+  const pointsTab = await getPointsTabName();
 
+  // Discord ID -> { rank, name, company } from the three line-company rosters (one
+  // read each) — avoids a per-member findUser, which would blow the read quota.
+  const memberById = new Map();
+  for (const [company, gid] of Object.entries(COMPANY_GID)) {
+    const info = tabNames[gid];
+    if (!info) continue;
+    const rrows = await fetchEnlistRows(info.name, ENLIST_READ_START, enlistEndRow(company));
+    for (const row of rrows) {
+      const id = (row[COL.DISCORD.idx] ?? "").toString().trim();
+      if (/^\d{17,20}$/.test(id)) {
+        memberById.set(id, {
+          rank:    (row[COL.RANK.idx] ?? "").toString().trim(),
+          name:    (row[COL.NAME.idx] ?? "").toString().trim(),
+          company,
+        });
+      }
+    }
+  }
+
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${pointsTab}!A:E` });
+  const rows = res.data.values ?? [];
   const groups = { Bayreuth: [], Rosenheim: [], Grenadier: [] };
   for (let i = 0; i < rows.length; i++) {
-    if ((rows[i][4] ?? "").toString().trim().toLowerCase() !== "true") continue;
     const userId = (rows[i][2] ?? "").toString().trim();
-    if (!userId) continue;
-    const found = await findUser(userId);
-    if (!found || !groups[found.company]) continue;
-    const rank = (found.rowData[COL.RANK.idx] ?? "").toString().trim();
-    const next = nextRank(rank);
-    if (!next) continue;
-    groups[found.company].push({
+    if (!/^\d{17,20}$/.test(userId)) continue;
+    const member = memberById.get(userId);
+    if (!member || !groups[member.company]) continue;
+    const points = parseInt((rows[i][1] ?? "0").toString(), 10) || 0;
+    const needed = pointsForNextRank(member.rank);
+    const next   = nextRank(member.rank);
+    // LIVE readiness: points must meet the CURRENT rank's threshold — never trust
+    // the E flag, which can go stale after a manual /user_rank_change or sheet edit.
+    if (needed == null || next == null || points < needed) continue;
+    groups[member.company].push({
       userId,
-      username:    (rows[i][0] ?? found.rowData[COL.NAME.idx] ?? "").toString(),
+      username:    (rows[i][0] ?? member.name ?? "").toString(),
       rowNumber:   i + 1,
-      currentRank: rank,
+      currentRank: member.rank,
       nextRank:    next,
     });
   }

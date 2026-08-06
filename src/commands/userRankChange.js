@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { promoteUser, findUser, findReserveUser, parseUsername } = require("../sheets");
-const { PROTECTED_RANKS } = require("../permissions");
+const { promoteUser, findUser, findReserveUser, parseUsername, resetPoints } = require("../sheets");
+const { PROTECTED_RANKS, POINTS_SYSTEM_ENABLED } = require("../permissions");
 
 const RANK_ROLE_IDS = new Set([
   process.env.RANK_ROLE_CONSCRIPT,
@@ -97,6 +97,14 @@ module.exports = {
     await targetMember.edit({ roles: newRoleSet }).catch(err =>
       console.error("Failed to update rank roles:", err.message)
     );
+
+    // Promotion-points: a rank change resets the member's points to 0 — their new
+    // rank has its own threshold. Guarded by the kill switch; no-op if no profile.
+    if (POINTS_SYSTEM_ENABLED) {
+      await resetPoints(targetUser.id).catch((err) =>
+        console.error("[points] rank-change reset failed:", err.message)
+      );
+    }
 
     return interaction.editReply({
       content: `✅ **${username}** has been changed from **${currentRank || "Unknown"}** to **${newRank}**.`,
