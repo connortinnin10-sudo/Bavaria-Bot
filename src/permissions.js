@@ -100,9 +100,9 @@ const POINTS_SYSTEM_ENABLED = true;
 // (promotions beyond it, into officer ranks, stay manual/discretionary).
 const PROMOTION_THRESHOLDS = {
   "Soldat":             10, // → Soldat de Premier
-  "Soldat de Premier":  20, // → Caporal
-  "Caporal":            30, // → Caporal de Premier
-  "Caporal de Premier": 50, // → Caporal-Fourrier
+  "Soldat de Premier":  15, // → Caporal
+  "Caporal":            25, // → Caporal de Premier
+  "Caporal de Premier": 35, // → Caporal-Fourrier
 };
 
 // Caporal-Fourrier is index 5 in RANK_ORDER — the ceiling for points-based
