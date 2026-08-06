@@ -117,7 +117,7 @@ function buildExileClearedEmbed({ officerId }) {
   return buildEmbed(SUCCESS_GREEN, "Exile Lifted", description);
 }
 
-// /add_recruitment-department and /add_propaganda-department
+// /department_add — Recruitment / Propaganda
 function buildDepartmentAddedEmbed({ department, officerId }) {
   const description = [
     `✅ You have been added to **${department}**.`,
@@ -127,7 +127,7 @@ function buildDepartmentAddedEmbed({ department, officerId }) {
   return buildEmbed(BAVARIAN_BLUE, "Added to Department", description);
 }
 
-// /add_flag-department — flag members carry a position and represent a company,
+// /department_add (Flag) — flag members carry a position and represent a company,
 // so they get a richer embed than the generic department one above.
 function buildFlagDepartmentAddedEmbed({ position, company, officerId }) {
   const description = [
@@ -178,9 +178,19 @@ function buildPromotionEmbed({ username, rank, nextThreshold }) {
   return buildEmbed(SUCCESS_GREEN, "Promotion", description);
 }
 
+// /recruit_add — DM to a recruiter whose recruit was logged (awards 1 point).
+function buildRecruitLoggedEmbed() {
+  return buildEmbed(
+    BAVARIAN_BLUE,
+    "Recruit Logged",
+    "Your recruit has been logged. You've received **1** promotion point.\nCheck your progress with `/my_stats`."
+  );
+}
+
 module.exports = {
   buildPointsAwardedEmbed,
   buildPromotionEmbed,
+  buildRecruitLoggedEmbed,
   buildDemeritAddEmbed,
   buildDemeritRemoveEmbed,
   buildDemeritResetEmbed,

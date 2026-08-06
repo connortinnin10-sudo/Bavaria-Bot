@@ -1,5 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { findUser, incrementRecruitCount } = require("../sheets");
+const { findUser, incrementRecruitCount, awardPoints } = require("../sheets");
+const { POINTS_SYSTEM_ENABLED } = require("../permissions");
+const { buildRecruitLoggedEmbed } = require("../notifyEmbeds");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -30,8 +32,21 @@ module.exports = {
       });
     }
 
+    // Award 1 promotion point for the logged recruit + DM the recruiter. Company
+    // members only (awardPoints enforces that); the tally already succeeded regardless.
+    let pointAwarded = false;
+    if (POINTS_SYSTEM_ENABLED) {
+      const res = await awardPoints(targetUser.id, 1).catch(() => null);
+      if (res && res.status === "ok") {
+        pointAwarded = true;
+        const { embed, files } = buildRecruitLoggedEmbed();
+        await targetUser.send({ embeds: [embed], files }).catch(() => null);
+      }
+    }
+
     return interaction.editReply({
-      content: `✅ Recruitment tally updated for **${username}**.\n> **Total recruits:** ${newCount}`,
+      content: `✅ Recruitment tally updated for **${username}**.\n> **Total recruits:** ${newCount}` +
+               (pointAwarded ? "\n> **+1 promotion point** awarded." : ""),
     });
   },
 };
