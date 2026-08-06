@@ -147,7 +147,6 @@ const ROLE_SPECIALIZATION = "1193815063480504370";
 const SPECIALIZATION_ROLES = {
   Sapper:     ["1361485325708562432", "1193815223891669102", ROLE_SPECIALIZATION], // Corps Sapper, Regiment Sapper
   Drummer:    ["1382539832005365821", ROLE_SPECIALIZATION],                        // Drummer
-  "Schützen": ["1443331846401167533", ROLE_SPECIALIZATION],                        // Schützen
 };
 
 const ROLE_ETAT_MAJOR        = "1193239194571649045"; // full access to every command

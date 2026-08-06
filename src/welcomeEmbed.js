@@ -286,7 +286,7 @@ function buildTransferEmbed({ userId, company, staff }) {
   return buildEmbed("Company Transfer", description);
 }
 
-// /user_assign_specialization — sent to a member given a Sapper/Drummer/Schützen role.
+// /user_assign_specialization — sent to a member given a Sapper/Drummer role.
 function buildSpecializationAssignEmbed({ userId, position, company }) {
   const mention = `<@${userId}>`;
 

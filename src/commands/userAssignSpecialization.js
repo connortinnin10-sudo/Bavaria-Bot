@@ -7,13 +7,12 @@ const { buildSpecializationAssignEmbed } = require("../welcomeEmbed");
 const MIN_RANK = {
   Sapper:     "Caporal",
   Drummer:    "Caporal",
-  "Schützen": "Caporal de Premier",
 };
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("user_assign_specialization")
-    .setDescription("Assign a member a specialist position (Sapper, Drummer, or Schützen)")
+    .setDescription("Assign a member a specialist position (Sapper or Drummer)")
     .addUserOption((opt) =>
       opt.setName("user").setDescription("The member to assign").setRequired(true)
     )
@@ -34,8 +33,7 @@ module.exports = {
         .setRequired(true)
         .addChoices(
           { name: "Sapper",   value: "Sapper"   },
-          { name: "Drummer",  value: "Drummer"  },
-          { name: "Schützen", value: "Schützen" }
+          { name: "Drummer",  value: "Drummer"  }
         )
     ),
 

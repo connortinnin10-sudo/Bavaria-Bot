@@ -76,12 +76,18 @@ const STAFF_RANGE = "C21:D26";
 
 // Specialist positions recorded on the company sheet itself, in slots separate
 // from the roster. Matched by name only (no Discord ID is stored in these cells).
-// Sapper/Drummer share the C(rank)/D(name) columns on fixed row pairs; Schützen
-// sit in AN(rank)/AO(name) across a range. Only Bayreuth/Rosenheim for now.
+// Layout is PER-COMPANY (Rosenheim differs from Bayreuth), keyed by the internal
+// company name (stable — tied to COMPANY_GID) so an upcoming display-name change
+// on Rosenheim won't affect it. Positions: Sapper, Drummer.
 const SPECIALIZATION_BLOCKS = {
-  Sapper:     { rows: [31, 32],             rankCol: "C",  nameCol: "D"  },
-  Drummer:    { rows: [33, 34],             rankCol: "C",  nameCol: "D"  },
-  "Schützen": { startRow: 15, endRow: 47,   rankCol: "AN", nameCol: "AO" },
+  Bayreuth: {
+    Sapper:  { rows: [31, 32], rankCol: "C", nameCol: "D" },
+    Drummer: { rows: [33, 34], rankCol: "C", nameCol: "D" },
+  },
+  Rosenheim: {
+    Sapper:  { rows: [31], rankCol: "C", nameCol: "D" },
+    Drummer: { rows: [32], rankCol: "C", nameCol: "D" },
+  },
 };
 
 // The full list of row numbers a specialization block occupies.
@@ -1375,7 +1381,7 @@ async function findSpecializations(company, username) {
   const found  = [];
   if (target === "") return found;
 
-  for (const [position, block] of Object.entries(SPECIALIZATION_BLOCKS)) {
+  for (const [position, block] of Object.entries(SPECIALIZATION_BLOCKS[company] ?? {})) {
     const byRow = await readSpecializationBlock(info.name, block);
     for (const [rowNumber, { name }] of byRow) {
       if (name.toLowerCase() === target) found.push({ position, rowNumber });
@@ -1391,8 +1397,8 @@ async function assignSpecialization({ company, position, rank, username }) {
   const info     = tabNames[COMPANY_GID[company]];
   if (!info) throw new Error(`No tab found for company: ${company}`);
 
-  const block = SPECIALIZATION_BLOCKS[position];
-  if (!block) throw new Error(`Unknown specialization: ${position}`);
+  const block = SPECIALIZATION_BLOCKS[company]?.[position];
+  if (!block) throw new Error(`Unknown specialization: ${position} for ${company}`);
 
   const byRow = await readSpecializationBlock(info.name, block);
   let targetRow = null;
@@ -1415,7 +1421,8 @@ async function removeSpecialization({ company, username }) {
   const matches = await findSpecializations(company, username);
   const sheets  = getSheetsClient();
   for (const { position, rowNumber } of matches) {
-    const block = SPECIALIZATION_BLOCKS[position];
+    const block = SPECIALIZATION_BLOCKS[company]?.[position];
+    if (!block) continue;
     await sheets.spreadsheets.values.clear({
       spreadsheetId: SHEET_ID,
       range: `${info.name}!${block.rankCol}${rowNumber}:${block.nameCol}${rowNumber}`,
