@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { addPoints } = require("../sheets");
+const { awardPoints } = require("../sheets");
 const { POINTS_SYSTEM_ENABLED } = require("../permissions");
 const { logCommand } = require("../commandLog");
 
@@ -32,15 +32,15 @@ module.exports = {
       return interaction.editReply({ content: "❌ No members tagged. Mention at least one member in the `users` field." });
     }
 
-    const updated   = [];
-    const noProfile = [];
+    const updated      = [];
+    const notInCompany = [];
     for (const id of ids) {
-      const result = await addPoints(id, amount).catch((err) => {
-        console.error("[user_add_point] addPoints failed for", id, err.message);
-        return null;
+      const res = await awardPoints(id, amount).catch((err) => {
+        console.error("[user_add_point] awardPoints failed for", id, err.message);
+        return { status: "error" };
       });
-      if (result) updated.push({ id, ...result });
-      else noProfile.push(id);
+      if (res.status === "ok") updated.push({ id, ...res });
+      else notInCompany.push(id);
     }
 
     const lines = [];
@@ -50,8 +50,11 @@ module.exports = {
         lines.push(`> <@${u.id}> — **${u.points}**${u.ready ? " • 🎖️ Ready for promotion" : ""}`);
       }
     }
-    if (noProfile.length) {
-      lines.push(`⚠️ No points profile (not a company member): ${noProfile.map((id) => `<@${id}>`).join(", ")}`);
+    if (notInCompany.length) {
+      lines.push(`⚠️ Not on a company roster (Bayreuth / Rosenheim / Grenadier) — skipped: ${notInCompany.map((id) => `<@${id}>`).join(", ")}`);
+    }
+    if (!updated.length && !notInCompany.length) {
+      lines.push("Nothing to do.");
     }
 
     // Rich audit log: officer, amount, and every member it was applied to.
@@ -59,7 +62,7 @@ module.exports = {
       commandName: "user_add_point",
       officerId: interaction.user.id,
       reason: `+${amount} to ${updated.map((u) => `<@${u.id}>`).join(", ") || "(none)"}` +
-              (noProfile.length ? ` | skipped (no profile): ${noProfile.map((id) => `<@${id}>`).join(", ")}` : ""),
+              (notInCompany.length ? ` | skipped (not in a company): ${notInCompany.map((id) => `<@${id}>`).join(", ")}` : ""),
     });
 
     return interaction.editReply({ content: lines.join("\n") });

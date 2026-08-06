@@ -1743,4 +1743,74 @@ async function getReadyMembers() {
   return groups;
 }
 
-module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, getPromotionProgress, getReadyMembers, getSheetsClient };
+// Line companies eligible for promotion points (excludes the Donauwörth depot,
+// reserves, and non-members). Keys match findUser().company.
+const LINE_COMPANIES = new Set(["Bayreuth", "Rosenheim", "Grenadier"]);
+
+// Policy entry point for the point commands: award `delta` points to a member,
+// but ONLY if they're on a line-company roster. Their profile is lazily created
+// if missing (covers members who predate the points system / the empty tab).
+// Returns { status: "ok", ...addPointsState } or { status: "not_in_company" }.
+async function awardPoints(userId, delta) {
+  const found = await findUser(userId);
+  if (!found || !LINE_COMPANIES.has(found.company)) {
+    return { status: "not_in_company" };
+  }
+  await ensureProfile(userId, (found.rowData[COL.NAME.idx] ?? "").toString().trim());
+  const state = await addPoints(userId, delta);
+  return { status: "ok", ...state };
+}
+
+// Fully clear a member's Points row (A:E) so no stale profile lingers — used when
+// they go to reserve. No-op if they have no row.
+async function removePointsProfile(userId) {
+  const current = await getUserPoints(userId);
+  if (!current) return false;
+  const sheets = getSheetsClient();
+  const tab    = await getPointsTabName();
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: SHEET_ID,
+    range: `${tab}!A${current.rowNumber}:E${current.rowNumber}`,
+  });
+  return true;
+}
+
+// One-time, idempotent backfill: give every current line-company member a Points
+// profile (0 points). Reads existing IDs once, then batch-appends the missing
+// ones. Safe to re-run — anyone already on the tab is skipped.
+async function backfillPointsProfiles() {
+  const sheets    = getSheetsClient();
+  const tabNames  = await getTabNames();
+  const pointsTab = await getPointsTabName();
+
+  const existingRes = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${pointsTab}!C:C` });
+  const existing = new Set((existingRes.data.values ?? []).map((r) => (r[0] ?? "").toString().trim()).filter(Boolean));
+
+  const toAppend = [];
+  let skipped = 0;
+  for (const [company, gid] of Object.entries(COMPANY_GID)) {
+    const info = tabNames[gid];
+    if (!info) continue;
+    const rows = await fetchEnlistRows(info.name, ENLIST_READ_START, enlistEndRow(company));
+    for (const row of rows) {
+      const discordId = (row[COL.DISCORD.idx] ?? "").toString().trim();
+      const name      = (row[COL.NAME.idx] ?? "").toString().trim();
+      if (!/^\d{17,20}$/.test(discordId)) continue;   // skip blank/non-member rows
+      if (existing.has(discordId)) { skipped++; continue; }
+      existing.add(discordId);                         // guard against dupes across sheets
+      toAppend.push([name, 0, "'" + discordId, todayMD(), ""]);
+    }
+  }
+
+  if (toAppend.length) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: `${pointsTab}!A:E`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: toAppend },
+    });
+  }
+  return { created: toAppend.length, skipped };
+}
+
+module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, awardPoints, removePointsProfile, backfillPointsProfiles, getPromotionProgress, getReadyMembers, getSheetsClient };
