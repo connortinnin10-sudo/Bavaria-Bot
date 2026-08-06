@@ -7,8 +7,8 @@ process.on("unhandledRejection", (err) => {
 });
 
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
-const { clearExpiredAccountabilities, isExiled, findUser } = require("./src/sheets");
-const { hasAnyRole, ROLE_ETAT_MAJOR, COMMAND_PERMISSIONS } = require("./src/permissions");
+const { clearExpiredAccountabilities, isExiled, findUser, reconcilePointsFlags } = require("./src/sheets");
+const { hasAnyRole, ROLE_ETAT_MAJOR, COMMAND_PERMISSIONS, POINTS_SYSTEM_ENABLED } = require("./src/permissions");
 const { buildLoaActiveEmbed, buildLoaEndedEmbed } = require("./src/notifyEmbeds");
 const { logCommand } = require("./src/commandLog");
 require("dotenv").config();
@@ -126,6 +126,32 @@ function scheduleMidnightCheck(client) {
   }, msUntilEstMidnight());
 }
 
+const RECONCILE_INTERVAL_MS = 3 * 60 * 60 * 1000; // every 3 hours
+
+function estWeekday() {
+  return new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "long" }).format(new Date());
+}
+
+// Backstop that keeps the Points "Ready" flags (col E) correct: runs every 3h,
+// every day EXCEPT Monday, reconciling each profile's flag against its rank's
+// threshold. Point awards already update the flag live; this catches drift after
+// a manual /user_rank_change or a hand edit.
+async function runReconcile() {
+  if (!POINTS_SYSTEM_ENABLED) return;
+  if (estWeekday() === "Monday") return;
+  try {
+    const { total, changed } = await reconcilePointsFlags();
+    if (changed) console.log(`[points] reconcile: ${changed}/${total} Ready flag(s) updated`);
+  } catch (err) {
+    console.error("[points] reconcile failed:", err.message);
+  }
+}
+
+function scheduleReconcile() {
+  runReconcile();                                   // once on startup
+  setInterval(runReconcile, RECONCILE_INTERVAL_MS); // then every 3h (skips Monday internally)
+}
+
 client.once("ready", async () => {
   console.log(`✅ Bot online as ${client.user.tag}`);
   console.log("[ranks] RANK_ROLE_CONSCRIPT:", process.env.RANK_ROLE_CONSCRIPT ?? "MISSING");
@@ -151,6 +177,7 @@ client.once("ready", async () => {
 
   runDailyCheck(client);
   scheduleMidnightCheck(client);
+  scheduleReconcile();
 });
 
 const handledInteractions = new Set();

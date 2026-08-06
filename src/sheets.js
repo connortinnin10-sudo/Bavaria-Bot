@@ -1616,7 +1616,7 @@ async function getUserPoints(userId) {
       rowNumber: i + 1,
       username:  (rows[i][0] ?? "").toString(),
       points:    parseInt((rows[i][1] ?? "0").toString(), 10) || 0,
-      ready:     (rows[i][4] ?? "").toString().trim().toLowerCase() === "ready",
+      ready:     (rows[i][4] ?? "").toString().trim().toLowerCase() === "true",
     };
   }
   return null;
@@ -1633,7 +1633,7 @@ async function ensureProfile(userId, username) {
     spreadsheetId: SHEET_ID,
     range: `${tab}!A:E`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[username ?? "", 0, "'" + userId, todayMD(), ""]] },
+    requestBody: { values: [[username ?? "", 0, "'" + userId, todayMD(), "false"]] },
   });
   return { rowNumber: null, username: username ?? "", points: 0, ready: false };
 }
@@ -1651,7 +1651,7 @@ async function refreshReadyFlag(userId, rowNumber, points) {
     spreadsheetId: SHEET_ID,
     range: `${tab}!E${rowNumber}`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[ready ? "Ready" : ""]] },
+    requestBody: { values: [[ready ? "true" : "false"]] },
   });
   return ready;
 }
@@ -1686,7 +1686,7 @@ async function resetPoints(userId) {
     spreadsheetId: SHEET_ID,
     range: `${tab}!B${current.rowNumber}:E${current.rowNumber}`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[0, "'" + userId, todayMD(), ""]] },
+    requestBody: { values: [[0, "'" + userId, todayMD(), "false"]] },
   });
   return true;
 }
@@ -1724,7 +1724,7 @@ async function getReadyMembers() {
 
   const groups = { Bayreuth: [], Rosenheim: [], Grenadier: [] };
   for (let i = 0; i < rows.length; i++) {
-    if ((rows[i][4] ?? "").toString().trim().toLowerCase() !== "ready") continue;
+    if ((rows[i][4] ?? "").toString().trim().toLowerCase() !== "true") continue;
     const userId = (rows[i][2] ?? "").toString().trim();
     if (!userId) continue;
     const found = await findUser(userId);
@@ -1798,7 +1798,7 @@ async function backfillPointsProfiles() {
       if (!/^\d{17,20}$/.test(discordId)) continue;   // skip blank/non-member rows
       if (existing.has(discordId)) { skipped++; continue; }
       existing.add(discordId);                         // guard against dupes across sheets
-      toAppend.push([name, 0, "'" + discordId, todayMD(), ""]);
+      toAppend.push([name, 0, "'" + discordId, todayMD(), "false"]);
     }
   }
 
@@ -1813,4 +1813,51 @@ async function backfillPointsProfiles() {
   return { created: toAppend.length, skipped };
 }
 
-module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, awardPoints, removePointsProfile, backfillPointsProfiles, getPromotionProgress, getReadyMembers, getSheetsClient };
+// Reconciliation sweep (scheduled every 3h except Monday): walk the Points tab and
+// set each profile's Ready flag (col E) to "true"/"false" from the member's CURRENT
+// rank vs its threshold. A backstop for E drifting after a manual /user_rank_change
+// or sheet edit (normal point awards already keep it live). One read per company
+// roster + one Points read + one batched E-column write.
+async function reconcilePointsFlags() {
+  const sheets    = getSheetsClient();
+  const tabNames  = await getTabNames();
+  const pointsTab = await getPointsTabName();
+
+  // Discord ID -> current rank, from the three line-company rosters.
+  const rankById = new Map();
+  for (const [company, gid] of Object.entries(COMPANY_GID)) {
+    const info = tabNames[gid];
+    if (!info) continue;
+    const rows = await fetchEnlistRows(info.name, ENLIST_READ_START, enlistEndRow(company));
+    for (const row of rows) {
+      const id = (row[COL.DISCORD.idx] ?? "").toString().trim();
+      if (/^\d{17,20}$/.test(id)) rankById.set(id, (row[COL.RANK.idx] ?? "").toString().trim());
+    }
+  }
+
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${pointsTab}!A:E` });
+  const rows = res.data.values ?? [];
+  const eColumn = [];
+  let changed = 0;
+  for (const row of rows) {
+    const id = (row[2] ?? "").toString().trim();
+    if (!/^\d{17,20}$/.test(id)) { eColumn.push([row[4] ?? ""]); continue; } // non-profile row untouched
+    const points  = parseInt((row[1] ?? "0").toString(), 10) || 0;
+    const needed  = pointsForNextRank(rankById.get(id) ?? "");
+    const desired = needed != null && points >= needed ? "true" : "false";
+    if ((row[4] ?? "").toString().trim().toLowerCase() !== desired) changed++;
+    eColumn.push([desired]);
+  }
+
+  if (rows.length) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `${pointsTab}!E1:E${rows.length}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: eColumn },
+    });
+  }
+  return { total: rows.length, changed };
+}
+
+module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, awardPoints, removePointsProfile, backfillPointsProfiles, reconcilePointsFlags, getPromotionProgress, getReadyMembers, getSheetsClient };
