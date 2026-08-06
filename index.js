@@ -19,7 +19,6 @@ client.commands = new Collection();
 
 const commands = [
   require("./src/commands/enlist"),
-  require("./src/commands/addToRegiment"),
   require("./src/commands/userExile"),
   require("./src/commands/userClearExile"),
   require("./src/commands/stats"),

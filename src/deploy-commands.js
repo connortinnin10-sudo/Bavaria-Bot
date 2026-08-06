@@ -3,7 +3,6 @@ require("dotenv").config();
 
 const commands = [
   require("./commands/enlist").data.toJSON(),
-  require("./commands/addToRegiment").data.toJSON(),
   require("./commands/userExile").data.toJSON(),
   require("./commands/userClearExile").data.toJSON(),
   require("./commands/stats").data.toJSON(),
