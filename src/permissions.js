@@ -173,7 +173,7 @@ const COMMAND_PERMISSIONS = {
   user_rank_change:    [ROLE_PETIT_ETAT_MAJOR],
   user_add_point:      [ROLE_PETIT_ETAT_MAJOR],
   user_remove_point:   [ROLE_PETIT_ETAT_MAJOR],
-  current_promotions:  [ROLE_PETIT_ETAT_MAJOR],
+  current_promotions:  [], // État-Major only — both running it and pressing Approve
   user_loa:            [ROLE_PETIT_ETAT_MAJOR],
   user_loa_remove:     [ROLE_PETIT_ETAT_MAJOR],
   demerit_add:         [ROLE_PETIT_ETAT_MAJOR],
