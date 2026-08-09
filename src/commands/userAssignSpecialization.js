@@ -23,7 +23,7 @@ module.exports = {
         .setRequired(true)
         .addChoices(
           { name: "Bayreuth",  value: "Bayreuth"  },
-          { name: "Rosenheim", value: "Rosenheim" }
+          { name: "Schützen",  value: "Schützen"  }
         )
     )
     .addStringOption((opt) =>

@@ -52,7 +52,7 @@ module.exports = {
       }
     }
     if (notInCompany.length) {
-      lines.push(`⚠️ Not on a company roster (Bayreuth / Rosenheim / Grenadier) — skipped: ${notInCompany.map((id) => `<@${id}>`).join(", ")}`);
+      lines.push(`⚠️ Not on a company roster (Bayreuth / Schützen / Grenadier) — skipped: ${notInCompany.map((id) => `<@${id}>`).join(", ")}`);
     }
     if (!updated.length && !notInCompany.length) {
       lines.push("Nothing to do.");

@@ -5,7 +5,7 @@
 //
 //  1. Company transfer welcomes — one per company, posted when a member LANDS in
 //     that company (via /transfer_company or a veteran /user_enlist):
-//       Rosenheim → ROSENHEIM_WEBHOOK_URL
+//       Schützen  → ROSENHEIM_WEBHOOK_URL (env var name kept from the old "Rosenheim")
 //       Bayreuth  → BAYREUTH_WEBHOOK_URL
 //       (Grenadier: add GRENADIER_WEBHOOK_URL here + set the var — no other change)
 //
@@ -20,7 +20,7 @@ const CREST_ATTACH  = "regiment-crest.png";
 const WELCOME_COLOR = 0x1E5AA8; // BAVARIAN_BLUE, same as notifyEmbeds.js
 
 const COMPANY_WEBHOOK_URLS = {
-  Rosenheim: process.env.ROSENHEIM_WEBHOOK_URL,
+  Schützen:  process.env.ROSENHEIM_WEBHOOK_URL, // env var name kept from the old "Rosenheim"
   Bayreuth:  process.env.BAYREUTH_WEBHOOK_URL,
 };
 

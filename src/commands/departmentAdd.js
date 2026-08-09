@@ -46,7 +46,7 @@ module.exports = {
         .setRequired(false)
         .addChoices(
           { name: "Bayreuth",  value: "Bayreuth"  },
-          { name: "Rosenheim", value: "Rosenheim" },
+          { name: "Schützen",  value: "Schützen"  },
           { name: "Grenadier", value: "Grenadier" }
         )
     ),

@@ -125,7 +125,7 @@ function pointsForNextRank(rank) {
 // before, which is why DEPT_ROLES and PROTECTED_ROLE_IDS were already moved here.
 const COMPANY_ROLES = {
   Bayreuth:  "1193814561401344010",
-  Rosenheim: "1506735371353063555",
+  Schützen:  "1506735371353063555", // formerly "Rosenheim"; role ID unchanged
   Grenadier: "1193814779161215107",
 };
 

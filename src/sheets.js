@@ -42,7 +42,7 @@ const COL = {
 
 const COMPANY_GID = {
   Bayreuth:  261215654,
-  Rosenheim: 1875189602,
+  Schützen:  1875189602, // formerly "Rosenheim"; GID is stable across the rename
   Grenadier: 161563671,
 };
 
@@ -76,15 +76,14 @@ const STAFF_RANGE = "C21:D26";
 
 // Specialist positions recorded on the company sheet itself, in slots separate
 // from the roster. Matched by name only (no Discord ID is stored in these cells).
-// Layout is PER-COMPANY (Rosenheim differs from Bayreuth), keyed by the internal
-// company name (stable — tied to COMPANY_GID) so an upcoming display-name change
-// on Rosenheim won't affect it. Positions: Sapper, Drummer.
+// Layout is PER-COMPANY (Schützen differs from Bayreuth), keyed by the internal
+// company name (stable — tied to COMPANY_GID). Positions: Sapper, Drummer.
 const SPECIALIZATION_BLOCKS = {
   Bayreuth: {
     Sapper:  { rows: [31, 32], rankCol: "C", nameCol: "D" },
     Drummer: { rows: [33, 34], rankCol: "C", nameCol: "D" },
   },
-  Rosenheim: {
+  Schützen: {
     Sapper:  { rows: [31], rankCol: "C", nameCol: "D" },
     Drummer: { rows: [32], rankCol: "C", nameCol: "D" },
   },
@@ -124,7 +123,7 @@ const DEPARTMENTS = {
     fetchRange: (s, e) => `H${s}:I${e}`,
   },
   "Flag Department": {
-    startRow: 18, endRow: 48,
+    startRow: 18, endRow: 61,
     positionCol: "K", rankCol: "L", nameCol: "M",
     rankIdx: 0,       nameIdx: 1,
     fetchRange: (s, e) => `L${s}:M${e}`,
@@ -133,14 +132,14 @@ const DEPARTMENTS = {
 };
 
 // Flag members sit in per-company sections rather than one flat list. The
-// Kommandant rows (16 Department, 17/18 Bayreuth, 33 Volts, 41 München) hold
-// permanent slot labels in column K and fall outside every section — the bot must
-// never write to or clear them. The middle section is labelled "Volts" on the
-// sheet but keyed by the company system's name "Rosenheim".
+// Kommandant/header rows (e.g. 32 and 42) hold permanent slot labels in column K
+// and fall between the sections — the bot must never write to or clear them. The
+// middle section is labelled "Schützen" on the sheet, matching the company
+// system's name "Schützen".
 const FLAG_SECTIONS = {
-  Bayreuth:  { startRow: 19, endRow: 32 },
-  Rosenheim: { startRow: 34, endRow: 40 }, // "Volts" section on the sheet
-  Grenadier: { startRow: 42, endRow: 48 }, // München section
+  Bayreuth:  { startRow: 18, endRow: 31 },
+  Schützen:  { startRow: 33, endRow: 41 }, // "Schützen" section on the sheet
+  Grenadier: { startRow: 43, endRow: 61 }, // München section
 };
 
 // Row numbers the bot manages for a department: the flat startRow..endRow range,
@@ -169,7 +168,7 @@ function deptClearRange(dept, rowNumber) {
 let tabNameCache = null;
 let tabNameCacheAt = 0;
 // Tab titles can be renamed on the sheet while the bot keeps running (e.g. the
-// Rosenheim company tab was renamed to "Voltigeur-Kompanie"). GIDs are stable but
+// Schützen company tab, formerly "Rosenheim", was later renamed). GIDs are stable but
 // titles are what we build A1 ranges from, so an indefinite cache would keep
 // pointing every range at the old, now-nonexistent title and fail with
 // "Unable to parse range" until a manual restart. A short TTL lets a rename
@@ -1789,7 +1788,7 @@ async function getReadyMembers() {
 
   const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${pointsTab}!A:E` });
   const rows = res.data.values ?? [];
-  const groups = { Bayreuth: [], Rosenheim: [], Grenadier: [] };
+  const groups = { Bayreuth: [], Schützen: [], Grenadier: [] };
   for (let i = 0; i < rows.length; i++) {
     const userId = (rows[i][2] ?? "").toString().trim();
     if (!/^\d{17,20}$/.test(userId)) continue;
@@ -1814,7 +1813,7 @@ async function getReadyMembers() {
 
 // Line companies eligible for promotion points (excludes the Donauwörth depot,
 // reserves, and non-members). Keys match findUser().company.
-const LINE_COMPANIES = new Set(["Bayreuth", "Rosenheim", "Grenadier"]);
+const LINE_COMPANIES = new Set(["Bayreuth", "Schützen", "Grenadier"]);
 
 // Policy entry point for the point commands: award `delta` points to a member,
 // but ONLY if they're on a line-company roster. Their profile is lazily created
@@ -1929,4 +1928,275 @@ async function reconcilePointsFlags() {
   return { total: rows.length, changed };
 }
 
-module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, awardPoints, removePointsProfile, backfillPointsProfiles, reconcilePointsFlags, getPromotionProgress, getReadyMembers, getSheetsClient };
+// ---------------------------------------------------------------------------
+// Platoons
+// ---------------------------------------------------------------------------
+// The Platoons tab (gid 1779561651) holds four platoons. Each block is
+// Position | Rank | Name on adjacent columns; the bot only ever writes Rank+Name
+// (the Position column is pre-labelled "Kommandant"/"Unterkommandant"/"Soldat" on
+// the sheet). Membership is stored by NAME only — no Discord ID column — so joins
+// to attendance (Input tab) and points (Points tab) are by username.
+//
+// Only the 8 "Soldat" slots per platoon are joinable via /user_add_platoon;
+// the two leadership rows are managed by hand. Löwenzug/Alpenzug/Donau sit side
+// by side on rows 18-25; Isar is a separate block lower down on rows 36-43.
+const PLATOON_GID = 1779561651;
+const PLATOONS = {
+  "Löwenzug": { rankCol: "C", nameCol: "D", startRow: 18, endRow: 25 },
+  "Alpenzug": { rankCol: "G", nameCol: "H", startRow: 18, endRow: 25 },
+  "Donau":    { rankCol: "K", nameCol: "L", startRow: 18, endRow: 25 },
+  "Isar":     { rankCol: "C", nameCol: "D", startRow: 36, endRow: 43 },
+};
+const PLATOON_ORDER = ["Löwenzug", "Alpenzug", "Donau", "Isar"];
+
+// The Input tab (gid 1662116744) is the daily attendance log. Row 10 holds the
+// M/D date headers; each date sits directly above its attendee "Name" column, and
+// attendee names run downward from row 12. Point award is a flat +1 per attendee.
+const INPUT_GID            = 1662116744;
+const INPUT_DATE_ROW       = 10;
+const INPUT_DATA_START_ROW = 12;
+const INPUT_DATA_END_ROW   = 500;
+const PLATOON_POINT_VALUE  = 1;
+
+// Independent record of platoon attendance points (kept separate from the Points
+// tab's shared "last updated" stamp so other point sources don't affect the
+// once-per-day platoon dedup). One appended row per award.
+// A=Date(M/D), B=Username, C=Discord ID, D=Points, E=Officer ID, F=Timestamp.
+const PLATOON_LOG_TAB = "PlatoonPointsLog";
+
+async function getPlatoonTabName() {
+  const tabNames = await getTabNames();
+  return tabNames[PLATOON_GID]?.name ?? "Platoons";
+}
+
+async function getInputTabName() {
+  const tabNames = await getTabNames();
+  return tabNames[INPUT_GID]?.name ?? "Input";
+}
+
+// Today's M/D stamp in America/New_York (matches the LOA job's date basis and the
+// human-entered Input headers), e.g. "8/8".
+function getTodayEstMD() {
+  const t = getTodayEst();
+  return `${t.getMonth() + 1}/${t.getDate()}`;
+}
+
+// 0-based column index -> A1 letters (0 -> A, 26 -> AA).
+function colLetter(idx) {
+  let s = "";
+  let n = idx + 1;
+  while (n > 0) {
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+// Read one platoon's [rank, name] rows, aligned to startRow..endRow.
+async function fetchPlatoonRows(tabName, cfg) {
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${tabName}!${cfg.rankCol}${cfg.startRow}:${cfg.nameCol}${cfg.endRow}`,
+  });
+  return res.data.values ?? [];
+}
+
+// Every occupied platoon slot: [{ platoon, rank, name, rowNumber }].
+async function getAllPlatoonMembers() {
+  const tabName = await getPlatoonTabName();
+  const out = [];
+  for (const platoon of PLATOON_ORDER) {
+    const cfg  = PLATOONS[platoon];
+    const rows = await fetchPlatoonRows(tabName, cfg);
+    for (let i = 0; i < (cfg.endRow - cfg.startRow + 1); i++) {
+      const row  = rows[i] ?? [];
+      const rank = (row[0] ?? "").toString().trim();
+      const name = (row[1] ?? "").toString().trim();
+      if (name) out.push({ platoon, rank, name, rowNumber: cfg.startRow + i });
+    }
+  }
+  return out;
+}
+
+// Which platoon (if any) a username occupies. Case-insensitive.
+async function findUserPlatoon(username) {
+  const target = (username ?? "").toString().trim().toLowerCase();
+  if (!target) return null;
+  const members = await getAllPlatoonMembers();
+  return members.find((m) => m.name.toLowerCase() === target) ?? null;
+}
+
+// Add a member to a platoon's first open Soldat slot. Throws UNKNOWN_PLATOON,
+// ALREADY_IN_PLATOON (err.platoon set), or NO_SPACE.
+async function addToPlatoon({ platoon, rank, username }) {
+  const cfg = PLATOONS[platoon];
+  if (!cfg) throw new Error("UNKNOWN_PLATOON");
+
+  const existing = await findUserPlatoon(username);
+  if (existing) {
+    const err = new Error("ALREADY_IN_PLATOON");
+    err.platoon = existing.platoon;
+    throw err;
+  }
+
+  const tabName = await getPlatoonTabName();
+  const rows    = await fetchPlatoonRows(tabName, cfg);
+  let targetRow = null;
+  for (let i = 0; i < (cfg.endRow - cfg.startRow + 1); i++) {
+    const name = ((rows[i] ?? [])[1] ?? "").toString().trim();
+    if (name === "") { targetRow = cfg.startRow + i; break; }
+  }
+  if (targetRow === null) throw new Error("NO_SPACE");
+
+  await writeRow(tabName, cfg.rankCol, cfg.nameCol, targetRow, [rank, username]);
+  return { platoon, rowNumber: targetRow };
+}
+
+// Remove a username from a specific platoon, or from whichever platoon they're in
+// when `platoon` is omitted. Returns { platoon, rowNumber } or null if not found.
+async function removeFromPlatoon({ platoon, username }) {
+  const tabName = await getPlatoonTabName();
+  const target  = (username ?? "").toString().trim().toLowerCase();
+  if (!target) return null;
+
+  const names = platoon ? [platoon] : PLATOON_ORDER;
+  for (const pname of names) {
+    const cfg = PLATOONS[pname];
+    if (!cfg) continue;
+    const rows = await fetchPlatoonRows(tabName, cfg);
+    for (let i = 0; i < (cfg.endRow - cfg.startRow + 1); i++) {
+      const name = ((rows[i] ?? [])[1] ?? "").toString().trim().toLowerCase();
+      if (name === target) {
+        const rowNumber = cfg.startRow + i;
+        const sheets = getSheetsClient();
+        await sheets.spreadsheets.values.clear({
+          spreadsheetId: SHEET_ID,
+          range: `${tabName}!${cfg.rankCol}${rowNumber}:${cfg.nameCol}${rowNumber}`,
+        });
+        return { platoon: pname, rowNumber };
+      }
+    }
+  }
+  return null;
+}
+
+// Lowercased attendee names present in the Input log for the given M/D date.
+// { found:false } when no column matches that date (nothing to award).
+async function getInputAttendanceNames(dateMD) {
+  const tabName = await getInputTabName();
+  const sheets  = getSheetsClient();
+
+  const dateRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${tabName}!A${INPUT_DATE_ROW}:BZ${INPUT_DATE_ROW}`,
+  });
+  const dateRow = dateRes.data.values?.[0] ?? [];
+  let colIdx = -1;
+  for (let i = 0; i < dateRow.length; i++) {
+    if ((dateRow[i] ?? "").toString().trim() === dateMD) { colIdx = i; break; }
+  }
+  if (colIdx === -1) return { found: false, names: new Set() };
+
+  const letter = colLetter(colIdx);
+  const nameRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${tabName}!${letter}${INPUT_DATA_START_ROW}:${letter}${INPUT_DATA_END_ROW}`,
+  });
+  const names = new Set();
+  for (const r of (nameRes.data.values ?? [])) {
+    const n = (r[0] ?? "").toString().trim();
+    if (n) names.add(n.toLowerCase());
+  }
+  return { found: true, names };
+}
+
+async function getOrCreatePlatoonLogTab() {
+  const sheets = getSheetsClient();
+  const meta   = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
+  const existing = meta.data.sheets.find((s) => s.properties.title === PLATOON_LOG_TAB);
+  if (existing) return existing.properties;
+  const res = await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: { requests: [{ addSheet: { properties: { title: PLATOON_LOG_TAB } } }] },
+  });
+  tabNameCache = null; // invalidate — a new tab exists
+  return res.data.replies[0].addSheet.properties;
+}
+
+// Lowercased usernames already awarded platoon points on the given date.
+async function getPlatoonAwardedToday(dateMD) {
+  await getOrCreatePlatoonLogTab();
+  const sheets = getSheetsClient();
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${PLATOON_LOG_TAB}!A:B` });
+  const rows = res.data.values ?? [];
+  const set  = new Set();
+  for (const r of rows) {
+    if ((r[0] ?? "").toString().trim() !== dateMD) continue;
+    const uname = (r[1] ?? "").toString().trim().toLowerCase();
+    if (uname) set.add(uname);
+  }
+  return set;
+}
+
+async function recordPlatoonAward({ dateMD, username, userId, points, officerId }) {
+  await getOrCreatePlatoonLogTab();
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: `${PLATOON_LOG_TAB}!A:F`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[dateMD, username, "'" + userId, points, "'" + (officerId ?? ""), new Date().toISOString()]] },
+  });
+}
+
+// Members eligible for platoon attendance points TODAY: in a platoon AND present in
+// today's Input attendance AND not already awarded platoon points today. Each is
+// resolved to a Points-tab profile (username -> Discord ID) so it can be awarded
+// and DM'd. `unmatched` are qualifying names with no resolvable Points profile.
+async function getPlatoonPointCandidates() {
+  const dateMD = getTodayEstMD();
+  const [attendance, platoonMembers, awarded] = await Promise.all([
+    getInputAttendanceNames(dateMD),
+    getAllPlatoonMembers(),
+    getPlatoonAwardedToday(dateMD),
+  ]);
+
+  const sheets = getSheetsClient();
+  const ptab   = await getPointsTabName();
+  const pres   = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ptab}!A:E` });
+  const prows  = pres.data.values ?? [];
+  const byName = new Map();
+  for (const row of prows) {
+    const uname = (row[0] ?? "").toString().trim();
+    if (!uname) continue;
+    byName.set(uname.toLowerCase(), {
+      username:  uname,
+      discordId: (row[2] ?? "").toString().trim(),
+      points:    parseInt((row[1] ?? "0").toString(), 10) || 0,
+    });
+  }
+
+  const eligible  = [];
+  const unmatched = [];
+  const seen      = new Set();
+  for (const m of platoonMembers) {
+    const key = m.name.toLowerCase();
+    if (!attendance.names.has(key)) continue; // must have attended today
+    if (awarded.has(key)) continue;           // already awarded platoon points today
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const profile = byName.get(key);
+    if (!profile || !/^\d{17,20}$/.test(profile.discordId)) {
+      unmatched.push({ name: m.name, platoon: m.platoon });
+      continue;
+    }
+    eligible.push({ name: profile.username, platoon: m.platoon, discordId: profile.discordId, points: profile.points });
+  }
+
+  return { dateMD, found: attendance.found, pointValue: PLATOON_POINT_VALUE, eligible, unmatched };
+}
+
+module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, awardPoints, removePointsProfile, backfillPointsProfiles, reconcilePointsFlags, getPromotionProgress, getReadyMembers, addToPlatoon, removeFromPlatoon, findUserPlatoon, getAllPlatoonMembers, getInputAttendanceNames, getPlatoonPointCandidates, recordPlatoonAward, PLATOON_ORDER, getSheetsClient };

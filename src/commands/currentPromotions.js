@@ -7,7 +7,7 @@ const { buildPromotionEmbed } = require("../notifyEmbeds");
 const BAVARIAN_BLUE = 0x1E5AA8;
 const CREST_PATH    = "./assets/regiment-crest.png";
 const CREST_ATTACH  = "regiment-crest.png";
-const COMPANY_ORDER = ["Rosenheim", "Bayreuth", "Grenadier"];
+const COMPANY_ORDER = ["Schützen", "Bayreuth", "Grenadier"];
 
 // Rank-role maps (env-based, same shape as userRankChange.js). The role swap on
 // approval strips whatever enlisted rank role a member holds and adds the new one.
