@@ -41,6 +41,9 @@ const commands = [
   require("./src/commands/demeritRemove"),
   require("./src/commands/demeritRemoveAll"),
   require("./src/commands/honoursSync"),
+  require("./src/commands/userAddPlatoon"),
+  require("./src/commands/userRemovePlatoon"),
+  require("./src/commands/addPlatoonPoints"),
 ];
 
 // /user_clear_exile must stay able to target exiled users; every other
@@ -60,6 +63,7 @@ const TRIAL_RESTRICTED = new Set([
   "department_remove",
   "user_rank_change",
   "user_assign_specialization",
+  "user_add_platoon",
 ]);
 
 // Read-only / self-service commands that don't need a command-log entry.
@@ -184,6 +188,11 @@ client.on("interactionCreate", async (interaction) => {
       const panel = client.commands.get("current_promotions");
       try { await panel.handleButton(interaction); }
       catch (err) { console.error("[button] promo handler error:", err.message); }
+    }
+    if (interaction.customId === "platoon_points_add" || interaction.customId === "platoon_points_close") {
+      const panel = client.commands.get("add_platoon_points");
+      try { await panel.handleButton(interaction); }
+      catch (err) { console.error("[button] platoon points handler error:", err.message); }
     }
     return;
   }

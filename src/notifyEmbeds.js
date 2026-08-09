@@ -150,6 +150,18 @@ function buildDepartmentRemovedEmbed({ department, officerId }) {
   return buildEmbed(BAVARIAN_BLUE, "Removed from Department", description);
 }
 
+// /user_add_platoon — DM to a member added to a platoon.
+function buildPlatoonAddedEmbed({ platoon, officerId }) {
+  const description = [
+    `✅ You have been added to the **${platoon}** platoon.`,
+    `> **Approved by:** <@${officerId}>`,
+    "",
+    "Attend platoon events to earn promotion points. Check your progress with `/my_stats`.",
+  ].join("\n");
+
+  return buildEmbed(BAVARIAN_BLUE, "Added to Platoon", description);
+}
+
 // /user_add_point — DM to a member who was awarded promotion points.
 function buildPointsAwardedEmbed({ amount, total }) {
   const description = [
@@ -188,6 +200,7 @@ function buildRecruitLoggedEmbed() {
 }
 
 module.exports = {
+  buildPlatoonAddedEmbed,
   buildPointsAwardedEmbed,
   buildPromotionEmbed,
   buildRecruitLoggedEmbed,
