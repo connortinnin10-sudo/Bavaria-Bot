@@ -179,6 +179,10 @@ const COMMAND_PERMISSIONS = {
   demerit_add:         [ROLE_PETIT_ETAT_MAJOR],
   demerit_remove:      [ROLE_PETIT_ETAT_MAJOR, ROLE_DEPARTMENT_HEAD],
 
+  user_add_platoon:    [ROLE_PETIT_ETAT_MAJOR],
+  user_remove_platoon: [ROLE_PETIT_ETAT_MAJOR],
+  add_platoon_points:  [ROLE_PETIT_ETAT_MAJOR],
+
   department_add:      [ROLE_DEPARTMENT_HEAD],
 
   recruit_add:         [ROLE_RECRUITMENT_STAFF],
