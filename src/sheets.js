@@ -2199,4 +2199,45 @@ async function getPlatoonPointCandidates() {
   return { dateMD, found: attendance.found, pointValue: PLATOON_POINT_VALUE, eligible, unmatched };
 }
 
-module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, awardPoints, removePointsProfile, backfillPointsProfiles, reconcilePointsFlags, getPromotionProgress, getReadyMembers, addToPlatoon, removeFromPlatoon, findUserPlatoon, getAllPlatoonMembers, getInputAttendanceNames, getPlatoonPointCandidates, recordPlatoonAward, PLATOON_ORDER, getSheetsClient };
+// ---------------------------------------------------------------------------
+// Bayreuth onboarding (one-time transfer welcome)
+// ---------------------------------------------------------------------------
+// Records who has already received the extended Bayreuth onboarding DM, so it's
+// only ever sent the first time a member lands in Bayreuth. A=Discord ID,
+// B=Username, C=Timestamp.
+const BAYREUTH_ONBOARD_TAB = "BayreuthOnboarded";
+
+async function getOrCreateBayreuthOnboardTab() {
+  const sheets = getSheetsClient();
+  const meta   = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
+  const existing = meta.data.sheets.find((s) => s.properties.title === BAYREUTH_ONBOARD_TAB);
+  if (existing) return existing.properties;
+  const res = await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: { requests: [{ addSheet: { properties: { title: BAYREUTH_ONBOARD_TAB } } }] },
+  });
+  tabNameCache = null; // invalidate — a new tab exists
+  return res.data.replies[0].addSheet.properties;
+}
+
+// True if this member has already received the Bayreuth onboarding DM.
+async function hasBayreuthOnboarded(userId) {
+  await getOrCreateBayreuthOnboardTab();
+  const sheets = getSheetsClient();
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${BAYREUTH_ONBOARD_TAB}!A:A` });
+  const rows = res.data.values ?? [];
+  return rows.some((r) => (r[0] ?? "").toString().trim() === userId.toString());
+}
+
+async function recordBayreuthOnboarded(userId, username) {
+  await getOrCreateBayreuthOnboardTab();
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: `${BAYREUTH_ONBOARD_TAB}!A:C`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [["'" + userId, username ?? "", new Date().toISOString()]] },
+  });
+}
+
+module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, awardPoints, removePointsProfile, backfillPointsProfiles, reconcilePointsFlags, getPromotionProgress, getReadyMembers, addToPlatoon, removeFromPlatoon, findUserPlatoon, getAllPlatoonMembers, getInputAttendanceNames, getPlatoonPointCandidates, recordPlatoonAward, PLATOON_ORDER, hasBayreuthOnboarded, recordBayreuthOnboarded, getSheetsClient };

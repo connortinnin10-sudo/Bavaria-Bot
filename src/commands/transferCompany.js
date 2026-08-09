@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { transferCompany, getCompanyStaff, ensureProfile, resetPoints } = require("../sheets");
-const { buildTransferEmbed, buildVeteranWelcomeBackEmbed } = require("../welcomeEmbed");
+const { transferCompany, getCompanyStaff, ensureProfile, resetPoints, hasBayreuthOnboarded, recordBayreuthOnboarded } = require("../sheets");
+const { buildTransferEmbed, buildVeteranWelcomeBackEmbed, buildBayreuthOnboardingEmbed } = require("../welcomeEmbed");
 const { sendCompanyWelcome } = require("../welcomeLog");
 const { COMPANY_ROLES, ROLE_DONAUWORTH, ROLE_REGIMENT, ROLE_BAVARIAN_RESERVES, ROLE_BAVARIA_VETERAN, ROLE_SPECIALIZATION, RESERVE_EXTRA_ROLE_IDS, POINTS_SYSTEM_ENABLED } = require("../permissions");
 
@@ -162,12 +162,21 @@ module.exports = {
       }
     }
 
-    // DM the member. Returning veterans get the "welcome back" embed; everyone else
-    // gets the standard transfer embed.
+    // DM the member. Returning veterans get the "welcome back" embed. First-time
+    // arrivals into Bayreuth get the one-time onboarding embed (recorded so it's
+    // never sent twice); everyone else gets the standard transfer embed.
     const staff = await getCompanyStaff(toCompany);
-    const { embed, files } = isVeteranReturn
-      ? buildVeteranWelcomeBackEmbed({ userId: targetUser.id, rank, company: toCompany, staff })
-      : buildTransferEmbed({ userId: targetUser.id, company: toCompany, staff });
+    let embed, files;
+    if (isVeteranReturn) {
+      ({ embed, files } = buildVeteranWelcomeBackEmbed({ userId: targetUser.id, rank, company: toCompany, staff }));
+    } else if (toCompany === "Bayreuth" && !(await hasBayreuthOnboarded(targetUser.id).catch(() => false))) {
+      ({ embed, files } = buildBayreuthOnboardingEmbed({ userId: targetUser.id, staff }));
+      await recordBayreuthOnboarded(targetUser.id, username).catch((err) =>
+        console.error("[bayreuth-onboard] record failed:", err.message)
+      );
+    } else {
+      ({ embed, files } = buildTransferEmbed({ userId: targetUser.id, company: toCompany, staff }));
+    }
     await targetUser.send({ embeds: [embed], files }).catch(() => null);
 
     // Announce the new arrival to their company's welcome webhook (no-op if that

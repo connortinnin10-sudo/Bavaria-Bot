@@ -286,6 +286,52 @@ function buildTransferEmbed({ userId, company, staff }) {
   return buildEmbed("Company Transfer", description);
 }
 
+// /transfer_company — one-time onboarding DM sent the FIRST time a member lands in
+// Bayreuth (tracked in the BayreuthOnboarded sheet). Extends the standard transfer
+// message with regiment progression info. Subsequent Bayreuth transfers fall back
+// to buildTransferEmbed.
+function buildBayreuthOnboardingEmbed({ userId, staff }) {
+  const mention = `<@${userId}>`;
+
+  const description = [
+    `You have been transferred to **FÜSILIER-KOMPANIE BAYREUTH**, ${mention}.`,
+    ``,
+    `Report to your new company staff for further instruction.`,
+    ``,
+    `🌿 *Etat Major*`,
+    ...staff.etatMajor.map(formatStaffLine),
+    ``,
+    `🌿 *Petit Etat Major*`,
+    ...staff.petitEtatMajor.map(formatStaffLine),
+    ``,
+    `**-**`,
+    ``,
+    `Now that you're a full fledged member of the regiment, here is some general information:`,
+    ``,
+    `## How do I get promoted?`,
+    `Promotions are earned through a point-based progression system. Points can be earned by attending events, joining a platoon, or actively contributing to a department. Our philosophy in Bavaria is simple: **the more you contribute, the more you achieve.**`,
+    ``,
+    `**Department and Platoon information**`,
+    `<#1535776319093088296>`,
+    `<#1232045152411975790>`,
+    ``,
+    `## How do I progress into the specialized companies?`,
+    `To be drafted into either the **Schützen** or **Grenadier** Company, members must meet the following basic requirements:`,
+    ``,
+    `🌿 Draft Requirements`,
+    `> At **minimum**, 40 KPE`,
+    `> Consistent activity`,
+    `> Holding the rank of Caporal-Fourrier`,
+    ``,
+    `Progression looks like this:`,
+    `Depot → Füsiliers → Schützen → Grenadiers`,
+    ``,
+    `Each company demands a greater level of skill, dedication, and performance than the last. **Strive for excellence**, prove your abilities, and work your way to the top.`,
+  ].join("\n");
+
+  return buildEmbed(`Welcome to Füsilier-Kompanie Bayreuth`, description);
+}
+
 // /user_assign_specialization — sent to a member given a Sapper/Drummer role.
 function buildSpecializationAssignEmbed({ userId, position, company }) {
   const mention = `<@${userId}>`;
@@ -319,4 +365,4 @@ function buildSpecializationRemoveEmbed({ userId, positions, company }) {
   return buildEmbed("Specialization Removed", description);
 }
 
-module.exports = { buildWelcomeEmbed, buildDonauworthWelcomeEmbed, buildVeteranWelcomeBackEmbed, buildVeteranReserveEmbed, buildMercenaryReserveEmbed, buildTransferEmbed, buildSpecializationAssignEmbed, buildSpecializationRemoveEmbed };
+module.exports = { buildWelcomeEmbed, buildDonauworthWelcomeEmbed, buildVeteranWelcomeBackEmbed, buildVeteranReserveEmbed, buildMercenaryReserveEmbed, buildTransferEmbed, buildBayreuthOnboardingEmbed, buildSpecializationAssignEmbed, buildSpecializationRemoveEmbed };
