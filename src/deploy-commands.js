@@ -27,7 +27,7 @@ const commands = [
   require("./commands/honoursSync").data.toJSON(),
   require("./commands/userAddPlatoon").data.toJSON(),
   require("./commands/userRemovePlatoon").data.toJSON(),
-  require("./commands/addPlatoonPoints").data.toJSON(),
+  require("./commands/addEventPoints").data.toJSON(),
 ];
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);

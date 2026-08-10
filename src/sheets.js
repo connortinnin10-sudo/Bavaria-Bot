@@ -1951,18 +1951,26 @@ const PLATOON_ORDER = ["Löwenzug", "Alpenzug", "Donau", "Isar"];
 
 // The Input tab (gid 1662116744) is the daily attendance log. Row 10 holds the
 // M/D date headers; each date sits directly above its attendee "Name" column, and
-// attendee names run downward from row 12. Point award is a flat +1 per attendee.
+// attendee names run downward from row 12.
 const INPUT_GID            = 1662116744;
 const INPUT_DATE_ROW       = 10;
 const INPUT_DATA_START_ROW = 12;
 const INPUT_DATA_END_ROW   = 500;
-const PLATOON_POINT_VALUE  = 1;
 
-// Independent record of platoon attendance points (kept separate from the Points
-// tab's shared "last updated" stamp so other point sources don't affect the
-// once-per-day platoon dedup). One appended row per award.
-// A=Date(M/D), B=Username, C=Discord ID, D=Points, E=Officer ID, F=Timestamp.
-const PLATOON_LOG_TAB = "PlatoonPointsLog";
+// Attendance point values for /add_event_points. Company attendance is worth more
+// on weekends; platoon attendance is always a flat +1. A member present in both a
+// company AND a platoon stacks the two (e.g. weekday company + platoon = 3).
+const COMPANY_ORDER          = ["Bayreuth", "Schützen", "Grenadier"];
+const COMPANY_POINTS_WEEKDAY = 2;
+const COMPANY_POINTS_WEEKEND = 4;
+const PLATOON_POINT_VALUE    = 1;
+
+// Independent record of attendance points awarded via /add_event_points (kept
+// separate from the Points tab's shared "last updated" stamp so other point
+// sources don't affect the once-per-day dedup). One appended row per award,
+// deduped by Discord ID: A=Date(M/D), B=Username, C=Discord ID, D=Points,
+// E=Officer ID, F=Timestamp.
+const EVENT_LOG_TAB = "EventPointsLog";
 
 async function getPlatoonTabName() {
   const tabNames = await getTabNames();
@@ -2112,91 +2120,197 @@ async function getInputAttendanceNames(dateMD) {
   return { found: true, names };
 }
 
-async function getOrCreatePlatoonLogTab() {
+// lowercased name -> { name, discordId, company, rank } across the three line
+// companies. One read per roster (avoids a per-member findUser). Attendance and
+// platoon membership are both name-based, so this is the join back to a Discord ID.
+async function getCompanyAttendeeIndex() {
+  const tabNames = await getTabNames();
+  const byName = new Map();
+  for (const company of COMPANY_ORDER) {
+    const info = tabNames[COMPANY_GID[company]];
+    if (!info) continue;
+    const rows = await fetchEnlistRows(info.name, ENLIST_READ_START, enlistEndRow(company));
+    for (const row of rows) {
+      const name      = (row[COL.NAME.idx] ?? "").toString().trim();
+      const discordId = (row[COL.DISCORD.idx] ?? "").toString().trim();
+      const rank      = (row[COL.RANK.idx] ?? "").toString().trim();
+      if (!name || !/^\d{17,20}$/.test(discordId)) continue;
+      byName.set(name.toLowerCase(), { name, discordId, company, rank });
+    }
+  }
+  return byName;
+}
+
+async function getOrCreateEventLogTab() {
   const sheets = getSheetsClient();
   const meta   = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
-  const existing = meta.data.sheets.find((s) => s.properties.title === PLATOON_LOG_TAB);
+  const existing = meta.data.sheets.find((s) => s.properties.title === EVENT_LOG_TAB);
   if (existing) return existing.properties;
   const res = await sheets.spreadsheets.batchUpdate({
     spreadsheetId: SHEET_ID,
-    requestBody: { requests: [{ addSheet: { properties: { title: PLATOON_LOG_TAB } } }] },
+    requestBody: { requests: [{ addSheet: { properties: { title: EVENT_LOG_TAB } } }] },
   });
   tabNameCache = null; // invalidate — a new tab exists
   return res.data.replies[0].addSheet.properties;
 }
 
-// Lowercased usernames already awarded platoon points on the given date.
-async function getPlatoonAwardedToday(dateMD) {
-  await getOrCreatePlatoonLogTab();
+// Discord IDs already awarded event points on the given date (col C = the dedup key).
+async function getEventAwardedToday(dateMD) {
+  await getOrCreateEventLogTab();
   const sheets = getSheetsClient();
-  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${PLATOON_LOG_TAB}!A:B` });
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${EVENT_LOG_TAB}!A:C` });
   const rows = res.data.values ?? [];
   const set  = new Set();
   for (const r of rows) {
     if ((r[0] ?? "").toString().trim() !== dateMD) continue;
-    const uname = (r[1] ?? "").toString().trim().toLowerCase();
-    if (uname) set.add(uname);
+    const id = (r[2] ?? "").toString().trim();
+    if (id) set.add(id);
   }
   return set;
 }
 
-async function recordPlatoonAward({ dateMD, username, userId, points, officerId }) {
-  await getOrCreatePlatoonLogTab();
+// Append one dedup-log row per award in a single call (scale-friendly).
+// `awards` = [{ username, userId, points }].
+async function recordEventAwards({ dateMD, officerId, awards }) {
+  if (!awards.length) return;
+  await getOrCreateEventLogTab();
   const sheets = getSheetsClient();
+  const ts = new Date().toISOString();
+  const values = awards.map((a) => [dateMD, a.username, "'" + a.userId, a.points, "'" + (officerId ?? ""), ts]);
   await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
-    range: `${PLATOON_LOG_TAB}!A:F`,
+    range: `${EVENT_LOG_TAB}!A:F`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[dateMD, username, "'" + userId, points, "'" + (officerId ?? ""), new Date().toISOString()]] },
+    requestBody: { values },
   });
 }
 
-// Members eligible for platoon attendance points TODAY: in a platoon AND present in
-// today's Input attendance AND not already awarded platoon points today. Each is
-// resolved to a Points-tab profile (username -> Discord ID) so it can be awarded
-// and DM'd. `unmatched` are qualifying names with no resolvable Points profile.
-async function getPlatoonPointCandidates() {
-  const dateMD = getTodayEstMD();
-  const [attendance, platoonMembers, awarded] = await Promise.all([
+// Everyone eligible for attendance points TODAY: present in today's Input column AND
+// on a line-company roster and/or in a platoon, resolved to a Discord ID, and not
+// already awarded today. `total` stacks company (2 weekday / 4 weekend) + platoon (1).
+// `unmatched` are attendees in a company/platoon whose Discord ID couldn't be resolved.
+async function getEventPointCandidates() {
+  const dateMD             = getTodayEstMD();
+  const isWeekend          = [0, 6].includes(getTodayEst().getDay());
+  const companyPointValue  = isWeekend ? COMPANY_POINTS_WEEKEND : COMPANY_POINTS_WEEKDAY;
+
+  const [attendance, companyIndex, platoonMembers, awarded] = await Promise.all([
     getInputAttendanceNames(dateMD),
+    getCompanyAttendeeIndex(),
     getAllPlatoonMembers(),
-    getPlatoonAwardedToday(dateMD),
+    getEventAwardedToday(dateMD),
   ]);
 
+  // Points-tab username -> Discord ID, to resolve platoon-only attendees with no
+  // company roster row (their platoon slot carries no Discord ID).
   const sheets = getSheetsClient();
   const ptab   = await getPointsTabName();
-  const pres   = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ptab}!A:E` });
-  const prows  = pres.data.values ?? [];
-  const byName = new Map();
-  for (const row of prows) {
+  const pres   = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${ptab}!A:C` });
+  const idByPointsName = new Map();
+  for (const row of (pres.data.values ?? [])) {
     const uname = (row[0] ?? "").toString().trim();
-    if (!uname) continue;
-    byName.set(uname.toLowerCase(), {
-      username:  uname,
-      discordId: (row[2] ?? "").toString().trim(),
-      points:    parseInt((row[1] ?? "0").toString(), 10) || 0,
-    });
+    if (uname) idByPointsName.set(uname.toLowerCase(), (row[2] ?? "").toString().trim());
   }
+
+  const platoonByName = new Map();
+  for (const m of platoonMembers) platoonByName.set(m.name.toLowerCase(), m); // first slot wins
 
   const eligible  = [];
   const unmatched = [];
-  const seen      = new Set();
-  for (const m of platoonMembers) {
-    const key = m.name.toLowerCase();
-    if (!attendance.names.has(key)) continue; // must have attended today
-    if (awarded.has(key)) continue;           // already awarded platoon points today
-    if (seen.has(key)) continue;
-    seen.add(key);
+  const seenId    = new Set();
 
-    const profile = byName.get(key);
-    if (!profile || !/^\d{17,20}$/.test(profile.discordId)) {
-      unmatched.push({ name: m.name, platoon: m.platoon });
+  for (const key of attendance.names) {
+    const comp = companyIndex.get(key);
+    const plat = platoonByName.get(key);
+    if (!comp && !plat) continue; // attended but neither a company member nor in a platoon
+
+    let discordId = comp?.discordId;
+    if (!discordId) {
+      const pid = idByPointsName.get(key);
+      if (/^\d{17,20}$/.test(pid ?? "")) discordId = pid;
+    }
+    const displayName = comp?.name ?? plat?.name ?? key;
+    if (!discordId) {
+      unmatched.push({ name: displayName, company: comp?.company ?? null, platoon: plat?.platoon ?? null });
       continue;
     }
-    eligible.push({ name: profile.username, platoon: m.platoon, discordId: profile.discordId, points: profile.points });
+    if (awarded.has(discordId)) continue; // already awarded event points today
+    if (seenId.has(discordId)) continue;
+    seenId.add(discordId);
+
+    const companyPoints = comp ? companyPointValue : 0;
+    const platoonPoints = plat ? PLATOON_POINT_VALUE : 0;
+    const total = companyPoints + platoonPoints;
+    if (total <= 0) continue;
+
+    eligible.push({
+      name:          displayName,
+      discordId,
+      company:       comp?.company ?? null,
+      platoon:       plat?.platoon ?? null,
+      rank:          comp?.rank ?? plat?.rank ?? "",
+      companyPoints,
+      platoonPoints,
+      total,
+    });
   }
 
-  return { dateMD, found: attendance.found, pointValue: PLATOON_POINT_VALUE, eligible, unmatched };
+  return { dateMD, isWeekend, companyPointValue, platoonPointValue: PLATOON_POINT_VALUE, found: attendance.found, eligible, unmatched };
+}
+
+// Bulk award for /add_event_points: read the Points tab ONCE, then batch-write.
+// Existing profiles get `total` added (B:E rewritten with points/id/date/Ready);
+// members with no profile are appended fresh (like ensureProfile + a first award).
+// Returns [{ discordId, name, awarded, total }] where `total` is the new balance.
+async function awardEventPoints(eligible) {
+  if (!eligible.length) return [];
+  const sheets = getSheetsClient();
+  const tab    = await getPointsTabName();
+  const res    = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${tab}!A:E` });
+  const rows   = res.data.values ?? [];
+
+  const byId = new Map();
+  for (let i = 0; i < rows.length; i++) {
+    const id = (rows[i][2] ?? "").toString().trim();
+    if (id) byId.set(id, { rowNumber: i + 1, points: parseInt((rows[i][1] ?? "0").toString(), 10) || 0 });
+  }
+
+  const stamp   = todayMD();
+  const updates = [];
+  const appends = [];
+  const results = [];
+  for (const e of eligible) {
+    const needed   = pointsForNextRank(e.rank ?? "");
+    const existing = byId.get(e.discordId);
+    const base     = existing ? existing.points : 0;
+    const newTotal = Math.max(0, base + e.total);
+    const ready    = needed != null && newTotal >= needed ? "true" : "false";
+    if (existing) {
+      updates.push({
+        range:  `${tab}!B${existing.rowNumber}:E${existing.rowNumber}`,
+        values: [[newTotal, "'" + e.discordId, stamp, ready]],
+      });
+    } else {
+      appends.push([e.name, newTotal, "'" + e.discordId, stamp, ready]);
+    }
+    results.push({ discordId: e.discordId, name: e.name, awarded: e.total, total: newTotal });
+  }
+
+  if (updates.length) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: SHEET_ID,
+      requestBody: { valueInputOption: "USER_ENTERED", data: updates },
+    });
+  }
+  if (appends.length) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: `${tab}!A:E`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: appends },
+    });
+  }
+  return results;
 }
 
 // ---------------------------------------------------------------------------
@@ -2240,4 +2354,4 @@ async function recordBayreuthOnboarded(userId, username) {
   });
 }
 
-module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, awardPoints, removePointsProfile, backfillPointsProfiles, reconcilePointsFlags, getPromotionProgress, getReadyMembers, addToPlatoon, removeFromPlatoon, findUserPlatoon, getAllPlatoonMembers, getInputAttendanceNames, getPlatoonPointCandidates, recordPlatoonAward, PLATOON_ORDER, hasBayreuthOnboarded, recordBayreuthOnboarded, getSheetsClient };
+module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, awardPoints, removePointsProfile, backfillPointsProfiles, reconcilePointsFlags, getPromotionProgress, getReadyMembers, addToPlatoon, removeFromPlatoon, findUserPlatoon, getAllPlatoonMembers, getInputAttendanceNames, getEventPointCandidates, awardEventPoints, recordEventAwards, PLATOON_ORDER, COMPANY_ORDER, hasBayreuthOnboarded, recordBayreuthOnboarded, getSheetsClient };

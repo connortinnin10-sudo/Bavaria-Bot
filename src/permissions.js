@@ -181,7 +181,7 @@ const COMMAND_PERMISSIONS = {
 
   user_add_platoon:    [ROLE_PETIT_ETAT_MAJOR],
   user_remove_platoon: [ROLE_PETIT_ETAT_MAJOR],
-  add_platoon_points:  [ROLE_PETIT_ETAT_MAJOR],
+  add_event_points:    [ROLE_PETIT_ETAT_MAJOR],
 
   department_add:      [ROLE_DEPARTMENT_HEAD],
 

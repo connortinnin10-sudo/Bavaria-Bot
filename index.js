@@ -43,7 +43,7 @@ const commands = [
   require("./src/commands/honoursSync"),
   require("./src/commands/userAddPlatoon"),
   require("./src/commands/userRemovePlatoon"),
-  require("./src/commands/addPlatoonPoints"),
+  require("./src/commands/addEventPoints"),
 ];
 
 // /user_clear_exile must stay able to target exiled users; every other
@@ -189,10 +189,10 @@ client.on("interactionCreate", async (interaction) => {
       try { await panel.handleButton(interaction); }
       catch (err) { console.error("[button] promo handler error:", err.message); }
     }
-    if (interaction.customId === "platoon_points_add" || interaction.customId === "platoon_points_close") {
-      const panel = client.commands.get("add_platoon_points");
+    if (interaction.customId === "event_points_add" || interaction.customId === "event_points_close") {
+      const panel = client.commands.get("add_event_points");
       try { await panel.handleButton(interaction); }
-      catch (err) { console.error("[button] platoon points handler error:", err.message); }
+      catch (err) { console.error("[button] event points handler error:", err.message); }
     }
     return;
   }
