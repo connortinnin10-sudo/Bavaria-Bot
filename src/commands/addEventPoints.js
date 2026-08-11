@@ -8,6 +8,11 @@ const BAVARIAN_BLUE = 0x1E5AA8;
 const CREST_PATH    = "./assets/regiment-crest.png";
 const CREST_ATTACH  = "regiment-crest.png";
 
+// Display-only labels for the panel — the internal company keys (Bayreuth, …)
+// stay unchanged everywhere else (rosters, awards, EventPointsLog).
+const COMPANY_DISPLAY = { Bayreuth: "Fusiliers" };
+const companyLabel = (c) => COMPANY_DISPLAY[c] ?? c;
+
 function isOfficer(member) {
   if (!member) return false;
   const allowed = COMMAND_PERMISSIONS["add_event_points"] ?? [];
@@ -42,13 +47,16 @@ function buildPanelEmbed({ dateMD, isWeekend, companyPointValue, found, eligible
     return { embed, total: 0 };
   }
 
+  embed.addFields({ name: "━━━━━━━━ 🏰 Companies ━━━━━━━━", value: "​" });
   for (const company of COMPANY_ORDER) {
     const members = eligible.filter((e) => e.company === company);
-    embed.addFields({ name: `🏰 ${company} (${members.length})`, value: listField(members) });
+    embed.addFields({ name: `${companyLabel(company)} (${members.length})`, value: listField(members) });
   }
+
+  embed.addFields({ name: "━━━━━━━━ ⚔️ Platoons ━━━━━━━━", value: "​" });
   for (const platoon of PLATOON_ORDER) {
     const members = eligible.filter((e) => e.platoon === platoon);
-    embed.addFields({ name: `⚔️ ${platoon} (${members.length})`, value: listField(members) });
+    embed.addFields({ name: `${platoon} (${members.length})`, value: listField(members) });
   }
 
   const skipped = unmatched.length
