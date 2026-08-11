@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require("discord.js");
 const { getEventPointCandidates, awardEventPoints, recordEventAwards, COMPANY_ORDER, PLATOON_ORDER } = require("../sheets");
-const { hasAnyRole, ROLE_ETAT_MAJOR, COMMAND_PERMISSIONS } = require("../permissions");
+const { hasAnyRole, ROLE_ETAT_MAJOR } = require("../permissions");
 const { logCommand } = require("../commandLog");
 const { buildPointsAwardedEmbed } = require("../notifyEmbeds");
 
@@ -13,10 +13,11 @@ const CREST_ATTACH  = "regiment-crest.png";
 const COMPANY_DISPLAY = { Bayreuth: "Fusiliers" };
 const companyLabel = (c) => COMPANY_DISPLAY[c] ?? c;
 
-function isOfficer(member) {
-  if (!member) return false;
-  const allowed = COMMAND_PERMISSIONS["add_event_points"] ?? [];
-  return hasAnyRole(member, ROLE_ETAT_MAJOR) || hasAnyRole(member, ...allowed);
+// Awarding is separated from running: COMMAND_PERMISSIONS gates who can RUN the
+// command and open the panel (Petit État-Major), but only État-Major may click
+// "Add Points" to approve the actual award.
+function canAward(member) {
+  return !!member && hasAnyRole(member, ROLE_ETAT_MAJOR);
 }
 
 // Render an eligible list as an embed field value, staying under Discord's 1024
@@ -94,8 +95,8 @@ module.exports = {
 
   // Routed here from index.js for the event_points_add / event_points_close buttons.
   async handleButton(interaction) {
-    if (!isOfficer(interaction.member)) {
-      return interaction.reply({ content: "⛔ You do not have permission to award attendance points.", flags: 64 });
+    if (!canAward(interaction.member)) {
+      return interaction.reply({ content: "⛔ Only État-Major can award attendance points.", flags: 64 });
     }
 
     if (interaction.customId === "event_points_close") {
