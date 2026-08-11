@@ -21,10 +21,11 @@ function canAward(member) {
 }
 
 // Render an eligible list as an embed field value, staying under Discord's 1024
-// char field limit (spills into "…and N more" if a section is very large).
+// char field limit (spills into "…and N more" if a section is very large). `×N`
+// marks members with more than one unpaid appearance (multiple events this run).
 function listField(members) {
   if (!members.length) return "_None_";
-  const lines = members.map((e) => `<@${e.discordId}> — ${e.name}`);
+  const lines = members.map((e) => `<@${e.discordId}> — ${e.name}${e.pending > 1 ? ` ×${e.pending}` : ""}`);
   let out = "";
   let shown = 0;
   for (const line of lines) {
@@ -63,11 +64,12 @@ function buildPanelEmbed({ dateMD, isWeekend, companyPointValue, found, eligible
   const skipped = unmatched.length
     ? `\n\n⚠️ Attended + in a company/platoon but no resolvable profile (skipped): ${unmatched.map((u) => u.name).join(", ")}`
     : "";
+  const pendingTotal = eligible.reduce((s, e) => s + e.totalToAdd, 0);
   embed.setDescription(
     (eligible.length
-      ? `**${eligible.length}** member${eligible.length === 1 ? "" : "s"} attended today. Press **Add Points** to award — ` +
-        `company **+${companyPointValue}**, platoon **+1** (both stack).`
-      : "No eligible members to award today.") + skipped
+      ? `**${eligible.length}** member${eligible.length === 1 ? "" : "s"} with unpaid attendance. Press **Add Points** to log this block — ` +
+        `company **+${companyPointValue}**/event, platoon **+1**/event, everything stacks. (**${pendingTotal}** pts total; \`×N\` = that many events.)`
+      : "Nothing new to award — every listed attendee has already been paid for their appearances today.") + skipped
   );
   return { embed, total: eligible.length };
 }
@@ -111,11 +113,15 @@ module.exports = {
 
     let awarded = [];
     try {
-      awarded = await awardEventPoints(eligible); // [{ discordId, name, awarded, total }]
+      awarded = await awardEventPoints(eligible); // [{ discordId, name, awarded, total, pending, perAppearance }]
+      // Log ONE ledger row per paid appearance, so the logged count matches the number
+      // of events already paid (a 2-event attendee gets two rows this run).
       await recordEventAwards({
         dateMD,
         officerId: interaction.user.id,
-        awards: awarded.map((a) => ({ username: a.name, userId: a.discordId, points: a.awarded })),
+        awards: awarded.flatMap((a) =>
+          Array.from({ length: a.pending }, () => ({ username: a.name, userId: a.discordId, points: a.perAppearance }))
+        ),
       });
     } catch (err) {
       console.error("[add_event_points] award failed:", err.message);
@@ -133,7 +139,7 @@ module.exports = {
       .setDescription(
         awarded.length
           ? `✅ Awarded **${awarded.length}** member${awarded.length === 1 ? "" : "s"}:\n` +
-            awarded.map((a) => `> <@${a.discordId}> — **+${a.awarded}** (now **${a.total}**)`).join("\n")
+            awarded.map((a) => `> <@${a.discordId}> — **+${a.awarded}**${a.pending > 1 ? ` (${a.pending} events)` : ""} (now **${a.total}**)`).join("\n")
           : "No one was eligible to award."
       );
 

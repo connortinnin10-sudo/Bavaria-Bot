@@ -2090,9 +2090,10 @@ async function removeFromPlatoon({ platoon, username }) {
   return null;
 }
 
-// Lowercased attendee names present in the Input log for the given M/D date.
-// { found:false } when no column matches that date (nothing to award).
-async function getInputAttendanceNames(dateMD) {
+// Every attendee entry in today's Input column, WITH repeats preserved — each
+// appearance of a name is one event = one payout (the per-appearance ledger). Order
+// is top-to-bottom. { found:false } when no column matches that date.
+async function getInputAttendanceEntries(dateMD) {
   const tabName = await getInputTabName();
   const sheets  = getSheetsClient();
 
@@ -2105,19 +2106,19 @@ async function getInputAttendanceNames(dateMD) {
   for (let i = 0; i < dateRow.length; i++) {
     if ((dateRow[i] ?? "").toString().trim() === dateMD) { colIdx = i; break; }
   }
-  if (colIdx === -1) return { found: false, names: new Set() };
+  if (colIdx === -1) return { found: false, entries: [] };
 
   const letter = colLetter(colIdx);
   const nameRes = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: `${tabName}!${letter}${INPUT_DATA_START_ROW}:${letter}${INPUT_DATA_END_ROW}`,
   });
-  const names = new Set();
+  const entries = [];
   for (const r of (nameRes.data.values ?? [])) {
     const n = (r[0] ?? "").toString().trim();
-    if (n) names.add(n.toLowerCase());
+    if (n) entries.push(n); // keep duplicates — each is a separate event appearance
   }
-  return { found: true, names };
+  return { found: true, entries };
 }
 
 // lowercased name -> { name, discordId, company, rank } across the three line
@@ -2154,23 +2155,26 @@ async function getOrCreateEventLogTab() {
   return res.data.replies[0].addSheet.properties;
 }
 
-// Discord IDs already awarded event points on the given date (col C = the dedup key).
-async function getEventAwardedToday(dateMD) {
+// How many appearances have ALREADY been paid today, per lowercased name. Each
+// logged row is one paid appearance (one event), so this is the running tally the
+// per-appearance ledger subtracts from the live column count to find what's unpaid.
+async function getEventLoggedCounts(dateMD) {
   await getOrCreateEventLogTab();
   const sheets = getSheetsClient();
-  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${EVENT_LOG_TAB}!A:C` });
+  const res  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${EVENT_LOG_TAB}!A:B` });
   const rows = res.data.values ?? [];
-  const set  = new Set();
+  const counts = new Map();
   for (const r of rows) {
     if ((r[0] ?? "").toString().trim() !== dateMD) continue;
-    const id = (r[2] ?? "").toString().trim();
-    if (id) set.add(id);
+    const key = (r[1] ?? "").toString().trim().toLowerCase();
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return set;
+  return counts;
 }
 
-// Append one dedup-log row per award in a single call (scale-friendly).
-// `awards` = [{ username, userId, points }].
+// Append one ledger row per PAID APPEARANCE in a single call — so the logged count
+// stays equal to the number of events already paid. `awards` = [{ username, userId,
+// points }], one entry per appearance (a 2-event attendee is passed twice).
 async function recordEventAwards({ dateMD, officerId, awards }) {
   if (!awards.length) return;
   await getOrCreateEventLogTab();
@@ -2185,20 +2189,23 @@ async function recordEventAwards({ dateMD, officerId, awards }) {
   });
 }
 
-// Everyone eligible for attendance points TODAY: present in today's Input column AND
-// on a line-company roster and/or in a platoon, resolved to a Discord ID, and not
-// already awarded today. `total` stacks company (2 weekday / 4 weekend) + platoon (1).
+// Everyone with UNPAID event appearances TODAY. Each occurrence of a name in today's
+// Input column is one event = one payout, and everything stacks with no cap. We pay
+// the difference between how many times a name appears now and how many appearances
+// have already been logged (paid) today — so re-running only pays newly-added rows,
+// and a name listed again for another event stacks. Each appearance is worth company
+// (2 weekday / 4 weekend, if on a line-company roster) + platoon (1, if in a platoon).
 // `unmatched` are attendees in a company/platoon whose Discord ID couldn't be resolved.
 async function getEventPointCandidates() {
   const dateMD             = getTodayEstMD();
   const isWeekend          = [0, 6].includes(getTodayEst().getDay());
   const companyPointValue  = isWeekend ? COMPANY_POINTS_WEEKEND : COMPANY_POINTS_WEEKDAY;
 
-  const [attendance, companyIndex, platoonMembers, awarded] = await Promise.all([
-    getInputAttendanceNames(dateMD),
+  const [attendance, companyIndex, platoonMembers, loggedCounts] = await Promise.all([
+    getInputAttendanceEntries(dateMD),
     getCompanyAttendeeIndex(),
     getAllPlatoonMembers(),
-    getEventAwardedToday(dateMD),
+    getEventLoggedCounts(dateMD),
   ]);
 
   // Points-tab username -> Discord ID, to resolve platoon-only attendees with no
@@ -2215,33 +2222,39 @@ async function getEventPointCandidates() {
   const platoonByName = new Map();
   for (const m of platoonMembers) platoonByName.set(m.name.toLowerCase(), m); // first slot wins
 
+  // Count each name's appearances in today's column (each = one event).
+  const occ = new Map(); // key -> { display, count }
+  for (const raw of attendance.entries) {
+    const key = raw.toLowerCase();
+    const cur = occ.get(key) ?? { display: raw, count: 0 };
+    cur.count++;
+    occ.set(key, cur);
+  }
+
   const eligible  = [];
   const unmatched = [];
-  const seenId    = new Set();
 
-  for (const key of attendance.names) {
+  for (const [key, info] of occ) {
     const comp = companyIndex.get(key);
     const plat = platoonByName.get(key);
-    if (!comp && !plat) continue; // attended but neither a company member nor in a platoon
+    if (!comp && !plat) continue; // present but neither a company member nor in a platoon
 
     let discordId = comp?.discordId;
     if (!discordId) {
       const pid = idByPointsName.get(key);
       if (/^\d{17,20}$/.test(pid ?? "")) discordId = pid;
     }
-    const displayName = comp?.name ?? plat?.name ?? key;
+    const displayName = comp?.name ?? plat?.name ?? info.display;
     if (!discordId) {
       unmatched.push({ name: displayName, company: comp?.company ?? null, platoon: plat?.platoon ?? null });
       continue;
     }
-    if (awarded.has(discordId)) continue; // already awarded event points today
-    if (seenId.has(discordId)) continue;
-    seenId.add(discordId);
 
-    const companyPoints = comp ? companyPointValue : 0;
-    const platoonPoints = plat ? PLATOON_POINT_VALUE : 0;
-    const total = companyPoints + platoonPoints;
-    if (total <= 0) continue;
+    const pending = info.count - (loggedCounts.get(key) ?? 0);
+    if (pending <= 0) continue; // every appearance already paid
+
+    const perAppearance = (comp ? companyPointValue : 0) + (plat ? PLATOON_POINT_VALUE : 0);
+    if (perAppearance <= 0) continue;
 
     eligible.push({
       name:          displayName,
@@ -2249,9 +2262,9 @@ async function getEventPointCandidates() {
       company:       comp?.company ?? null,
       platoon:       plat?.platoon ?? null,
       rank:          comp?.rank ?? plat?.rank ?? "",
-      companyPoints,
-      platoonPoints,
-      total,
+      perAppearance,
+      pending,
+      totalToAdd:    pending * perAppearance,
     });
   }
 
@@ -2259,9 +2272,10 @@ async function getEventPointCandidates() {
 }
 
 // Bulk award for /add_event_points: read the Points tab ONCE, then batch-write.
-// Existing profiles get `total` added (B:E rewritten with points/id/date/Ready);
+// Existing profiles get `totalToAdd` added (B:E rewritten with points/id/date/Ready);
 // members with no profile are appended fresh (like ensureProfile + a first award).
-// Returns [{ discordId, name, awarded, total }] where `total` is the new balance.
+// Returns [{ discordId, name, awarded, total, pending, perAppearance }] where `total`
+// is the new balance and `awarded` is what was added this run (pending × perAppearance).
 async function awardEventPoints(eligible) {
   if (!eligible.length) return [];
   const sheets = getSheetsClient();
@@ -2283,7 +2297,7 @@ async function awardEventPoints(eligible) {
     const needed   = pointsForNextRank(e.rank ?? "");
     const existing = byId.get(e.discordId);
     const base     = existing ? existing.points : 0;
-    const newTotal = Math.max(0, base + e.total);
+    const newTotal = Math.max(0, base + e.totalToAdd);
     const ready    = needed != null && newTotal >= needed ? "true" : "false";
     if (existing) {
       updates.push({
@@ -2293,7 +2307,7 @@ async function awardEventPoints(eligible) {
     } else {
       appends.push([e.name, newTotal, "'" + e.discordId, stamp, ready]);
     }
-    results.push({ discordId: e.discordId, name: e.name, awarded: e.total, total: newTotal });
+    results.push({ discordId: e.discordId, name: e.name, awarded: e.totalToAdd, total: newTotal, pending: e.pending, perAppearance: e.perAppearance });
   }
 
   if (updates.length) {
@@ -2354,4 +2368,4 @@ async function recordBayreuthOnboarded(userId, username) {
   });
 }
 
-module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, awardPoints, removePointsProfile, backfillPointsProfiles, reconcilePointsFlags, getPromotionProgress, getReadyMembers, addToPlatoon, removeFromPlatoon, findUserPlatoon, getAllPlatoonMembers, getInputAttendanceNames, getEventPointCandidates, awardEventPoints, recordEventAwards, PLATOON_ORDER, COMPANY_ORDER, hasBayreuthOnboarded, recordBayreuthOnboarded, getSheetsClient };
+module.exports = { enlistUser, enlistToDonauworth, removeUser, getStats, findUser, parseUsername, addToDepartment, addToFlagDepartment, removeFromDepartment, removeFromAllDepartments, promoteUser, getActiveAccountability, applyAccountability, removeAccountability, clearExpiredAccountabilities, findReserveUser, reserveUser, removeReserveUser, incrementRecruitCount, decrementRecruitCount, clearRecruitSheet, getDemeritCount, addDemerit, removeDemerit, removeAllDemerits, getCompanyStaff, exileUser, isExiled, clearExile, transferCompany, findSpecializations, assignSpecialization, removeSpecialization, getUserPoints, ensureProfile, addPoints, resetPoints, awardPoints, removePointsProfile, backfillPointsProfiles, reconcilePointsFlags, getPromotionProgress, getReadyMembers, addToPlatoon, removeFromPlatoon, findUserPlatoon, getAllPlatoonMembers, getInputAttendanceEntries, getEventPointCandidates, awardEventPoints, recordEventAwards, PLATOON_ORDER, COMPANY_ORDER, hasBayreuthOnboarded, recordBayreuthOnboarded, getSheetsClient };
