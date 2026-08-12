@@ -670,9 +670,10 @@ async function getStats(userId) {
   const loaRaw   = row[3];
   const loaActive = loaRaw === true || (loaRaw ?? "").toString().trim().toUpperCase() === "TRUE";
 
-  const [demerits, departments] = await Promise.all([
+  const [demerits, departments, platoon] = await Promise.all([
     getDemeritCount(userId).catch(() => 0),
     getUserDepartments(username).catch(() => []),
+    findUserPlatoon(username).catch(() => null),
   ]);
 
   return {
@@ -685,6 +686,7 @@ async function getStats(userId) {
     loaActive,
     demerits,
     departments,
+    platoon:    platoon?.platoon ?? null,
   };
 }
 
@@ -1937,15 +1939,18 @@ async function reconcilePointsFlags() {
 // the sheet). Membership is stored by NAME only — no Discord ID column — so joins
 // to attendance (Input tab) and points (Points tab) are by username.
 //
-// Only the 8 "Soldat" slots per platoon are joinable via /user_add_platoon;
-// the two leadership rows are managed by hand. Löwenzug/Alpenzug/Donau sit side
-// by side on rows 18-25; Isar is a separate block lower down on rows 36-43.
+// Only the 8 "Soldat" slots per platoon (startRow..endRow) are joinable via
+// /user_add_platoon and clearable via /user_remove_platoon. The two leadership rows
+// directly above (readStartRow..startRow-1: Kommandant/Unterkommandant, hand-managed)
+// are READ-ONLY: included in membership reads so leaders count for /my_stats and
+// event points, but never written or cleared by the bot. Löwenzug/Alpenzug/Donau sit
+// side by side (leaders 16-17, Soldat 18-25); Isar is lower (leaders 34-35, Soldat 36-43).
 const PLATOON_GID = 1779561651;
 const PLATOONS = {
-  "Löwenzug": { rankCol: "C", nameCol: "D", startRow: 18, endRow: 25 },
-  "Alpenzug": { rankCol: "G", nameCol: "H", startRow: 18, endRow: 25 },
-  "Donau":    { rankCol: "K", nameCol: "L", startRow: 18, endRow: 25 },
-  "Isar":     { rankCol: "C", nameCol: "D", startRow: 36, endRow: 43 },
+  "Löwenzug": { rankCol: "C", nameCol: "D", startRow: 18, endRow: 25, readStartRow: 16 },
+  "Alpenzug": { rankCol: "G", nameCol: "H", startRow: 18, endRow: 25, readStartRow: 16 },
+  "Donau":    { rankCol: "K", nameCol: "L", startRow: 18, endRow: 25, readStartRow: 16 },
+  "Isar":     { rankCol: "C", nameCol: "D", startRow: 36, endRow: 43, readStartRow: 34 },
 };
 const PLATOON_ORDER = ["Löwenzug", "Alpenzug", "Donau", "Isar"];
 
@@ -2001,28 +2006,34 @@ function colLetter(idx) {
   return s;
 }
 
-// Read one platoon's [rank, name] rows, aligned to startRow..endRow.
-async function fetchPlatoonRows(tabName, cfg) {
+// Read one platoon's [rank, name] rows. Defaults to the writable Soldat range
+// (startRow..endRow); pass fromRow = cfg.readStartRow to also include the two
+// hand-managed leadership rows above it (read-only — never written).
+async function fetchPlatoonRows(tabName, cfg, fromRow = cfg.startRow) {
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: `${tabName}!${cfg.rankCol}${cfg.startRow}:${cfg.nameCol}${cfg.endRow}`,
+    range: `${tabName}!${cfg.rankCol}${fromRow}:${cfg.nameCol}${cfg.endRow}`,
   });
   return res.data.values ?? [];
 }
 
-// Every occupied platoon slot: [{ platoon, rank, name, rowNumber }].
+// Every occupied platoon slot, INCLUDING the two hand-managed leadership rows
+// (Kommandant/Unterkommandant) so leaders count as platoon members for /my_stats
+// and event points. Leadership rows are read-only — add/remove never touch them.
+// [{ platoon, rank, name, rowNumber, isLeader }].
 async function getAllPlatoonMembers() {
   const tabName = await getPlatoonTabName();
   const out = [];
   for (const platoon of PLATOON_ORDER) {
-    const cfg  = PLATOONS[platoon];
-    const rows = await fetchPlatoonRows(tabName, cfg);
-    for (let i = 0; i < (cfg.endRow - cfg.startRow + 1); i++) {
+    const cfg     = PLATOONS[platoon];
+    const fromRow = cfg.readStartRow ?? cfg.startRow;
+    const rows    = await fetchPlatoonRows(tabName, cfg, fromRow);
+    for (let i = 0; i < (cfg.endRow - fromRow + 1); i++) {
       const row  = rows[i] ?? [];
       const rank = (row[0] ?? "").toString().trim();
       const name = (row[1] ?? "").toString().trim();
-      if (name) out.push({ platoon, rank, name, rowNumber: cfg.startRow + i });
+      if (name) out.push({ platoon, rank, name, rowNumber: fromRow + i, isLeader: (fromRow + i) < cfg.startRow });
     }
   }
   return out;

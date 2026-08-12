@@ -75,6 +75,7 @@ function buildPersonalStatsEmbed(stats, progress = null) {
     .addFields(
       { name: "Rank",        value: `${stats.rank}`,        inline: true },
       { name: "Company",     value: `${stats.company}`,     inline: true },
+      { name: "Platoon",     value: `${stats.platoon ?? "None"}`, inline: true },
       { name: "KPE",         value: `${stats.kpe}`,         inline: true },
       { name: "Activity",    value: `${stats.activity}`,    inline: true },
       { name: "Total Kills", value: `${stats.kills}`,       inline: true },
